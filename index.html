@@ -19,7 +19,7 @@
 <div class="field-grid">
 <label>진영 <span>TEAM</span><select id="char-team"><option value="A">A 진영</option><option value="B">B 진영</option><option value="N">중립</option></select></label>
 </div>
-<p class="small-note">각 능력치는 1~8등급으로 선택합니다. 실제 수치는 아래 <b>상셋값 설정</b>에서 등급별로 지정합니다.</p>
+<p class="small-note">각 능력치는 <b>스탯 번호</b>로 입력합니다. 실제 수치는 아래 스탯 테이블에서 지정합니다.</p>
 <div id="custom-stat-fields" class="field-grid"></div>
 <button class="button button-primary full-width" type="submit">＋ 전체 캐릭터에 저장</button><button id="cancel-character-edit" class="button button-quiet full-width" type="button" hidden>수정 취소</button>
 </form>
@@ -27,7 +27,6 @@
 <section class="panel">
 <div class="section-heading"><span class="section-index">02</span><h2>전투 설정</h2></div>
 <label class="setting-row">선공 방식 <select id="initiative-mode"><option value="speed">민첩순 전투</option><option value="contest-each">매 턴 민첩 대항 판정</option></select></label>
-<label class="setting-row">도주 보정치 (%) <input id="escape-bonus" type="number" value="10"></label>
 <div class="button-stack">
 <button id="start-battle" class="button button-primary">전투 인원으로 전투 시작</button>
 <button id="next-turn" class="button button-secondary">차례 넘기기 <span>↗</span></button>
@@ -37,10 +36,10 @@
 </section>
 <section class="panel">
 <div class="section-heading"><span class="section-index">03</span><h2>능력치 테이블</h2></div>
-<p class="helper-text">캐릭터는 각 능력치의 등급(Lv.1~8)을 선택합니다. 아래 표에서 등급별 실제 수치를 직접 수정할 수 있습니다.</p>
+<p class="helper-text">행은 스탯 번호이며, 기본 5단계입니다. 각 능력치 열의 값을 직접 설정할 수 있습니다.</p>
 <div class="table-scroll"><table class="stat-table"><thead id="mapping-head"></thead><tbody id="mapping-body"></tbody></table></div>
-<p class="small-note">현재 전투 기본 능력치는 체력(HP), 공격(ATK), 방어(DEF), 민첩(AGI), 행운(LUK) 5종입니다. 이 표의 값을 바꾸면 해당 등급의 캐릭터에게 즉시 반영됩니다.</p>
-<button id="reset-config" class="button button-quiet full-width">기본 상셋값으로 초기화</button>
+<p class="small-note">기본 능력치는 체력(HP), 공격(ATK), 방어(DEF), 민첩(AGI), 행운(LUK) 5종입니다. 스탯 단계를 추가하면 캐릭터 생성 화면의 입력 범위도 함께 늘어납니다.</p>
+<div class="button-grid"><button id="add-stat-row" class="button button-secondary">＋ 스탯 단계 추가</button><button id="remove-stat-row" class="button button-quiet">－ 마지막 단계 삭제</button></div><button id="reset-config" class="button button-quiet full-width" style="margin-top:7px">기본 스탯값으로 초기화</button>
 </section>
 <section class="panel data-panel">
 <div class="section-heading"><span class="section-index">04</span><h2>데이터 관리</h2></div>

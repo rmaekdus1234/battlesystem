@@ -12,7 +12,7 @@ const DEFAULT_STATS=[
  {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
  {id:"heal",name:"치유(HEAL)",type:"number",role:"heal",defaults:["10","1d6+2","2d6","2d8+2","3d8"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]}
 ];
-let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, toastTimer;
+let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, round=0, roundOrder=[], toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -21,7 +21,7 @@ const alive=c=>!!c&&!c.dead&&!c.escaped;
 const stat=(c,role)=>stats.find(s=>s.role===role);
 const rowCount=()=>Math.max(1,...stats.map(s=>s.defaults.length));
 
-function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames});}
+function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,round,roundOrder});}
 function save(){
  try{
   const payload=JSON.stringify(snapshot());
@@ -40,7 +40,7 @@ function load(){
   if(!raw){stats=clone(DEFAULT_STATS);return;}
   const d=JSON.parse(raw);
   stats=normalizeStats(d.stats||clone(DEFAULT_STATS)); library=Array.isArray(d.library)?d.library:[]; roster=Array.isArray(d.roster)?d.roster:[];
-  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; 
+  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
   migrateCharacters();
  }catch(e){console.warn("저장 데이터 불러오기 실패",e);}
 }
@@ -90,12 +90,13 @@ function toast(t){const el=$("toast");el.textContent=t;el.classList.add("visible
 function log(t,type="normal"){logs.push({time:new Date().toLocaleTimeString("ko-KR"),message:t,type});if(logs.length>1000)logs=logs.slice(-1000);renderLogs();}
 function roll(expr){const s=String(expr??"0").trim().toLowerCase().replace(/\s/g,"");const m=s.match(/^(\d+)d(\d+)([+-]\d+(?:\.\d+)?)?$/);if(m){const n=clamp(+m[1],1,100),sides=clamp(+m[2],1,10000),r=Array.from({length:n},()=>1+Math.floor(Math.random()*sides)),bonus=+(m[3]||0),sum=r.reduce((a,b)=>a+b,0)+bonus;return{value:sum,desc:`${expr} → [${r.join(", ")}]${bonus?` ${bonus>0?"+":""}${bonus}`:""} = ${sum}`};}const n=Number(s);return{value:Number.isFinite(n)?n:0,desc:`${expr} → ${Number.isFinite(n)?n:0}`};}
 
+function validHex(v){return /^#[0-9a-fA-F]{6}$/.test(String(v||""));}
 function factionName(team){return factionNames[team]||team;}
 function teamLabel(team){return esc(factionName(team));}
 function renderFactionControls(){
  const a=$("faction-a"),b=$("faction-b");if(a)a.value=factionNames.A;if(b)b.value=factionNames.B;
  document.querySelectorAll("[data-filter=\"A\"]").forEach(b=>b.textContent=factionNames.A);document.querySelectorAll("[data-filter=\"B\"]").forEach(b=>b.textContent=factionNames.B);document.querySelectorAll("[data-library-filter=\"A\"]").forEach(b=>b.textContent=factionNames.A);document.querySelectorAll("[data-library-filter=\"B\"]").forEach(b=>b.textContent=factionNames.B);
- const sel=$("char-team");if(sel)Array.from(sel.options).forEach(o=>{if(o.value==="A")o.textContent=factionNames.A;if(o.value==="B")o.textContent=factionNames.B;});
+ const sel=$("char-team");if(sel)Array.from(sel.options).forEach(o=>{if(o.value==="A")o.textContent=factionNames.A;if(o.value==="B")o.textContent=factionNames.B;}); ["A","B"].forEach(t=>{const color=$(t==="A"?"faction-a-color":"faction-b-color"),hex=$(t==="A"?"faction-a-hex":"faction-b-hex");if(color)color.value=factionColors[t];if(hex)hex.value=factionColors[t];});
 }
 function renderStats(){
  const n=rowCount();
@@ -125,11 +126,11 @@ function render(){
  $("next-turn").disabled=!started||!!pending||!cur;$("undo").disabled=!history.length;
  const renderCard=c=>{
   const current=started&&c.id===currentId&&!pending,target=pending?.targetId===c.id,protector=!!pending&&c.id!==pending.targetId&&c.team===get(roster,pending.targetId)?.team,inactive=!alive(c),pct=clamp(c.curHp/c.maxHp*100,0,100);let actions="";
-  if(current&&alive(c)){actions+=roster.filter(t=>t.id!==c.id&&alive(t)&&canAttackTarget(c,t)).map(t=>`<button class="button button-attack" data-act="attack" data-id="${c.id}" data-target="${t.id}">공격 · ${esc(t.name)}</button>`).join("");actions+=roster.filter(t=>alive(t)&&canHealTarget(c,t)).map(t=>`<button class="button button-heal" data-act="heal" data-id="${c.id}" data-target="${t.id}">회복 · ${esc(t.name)}</button>`).join("");actions+=`<button class="button button-secondary" data-act="skip" data-id="${c.id}">차례 넘김</button><button class="button button-escape" data-act="escape" data-id="${c.id}">도주</button>`;}
+  if(current&&alive(c)){actions+=roster.filter(t=>t.id!==c.id&&alive(t)&&canAttackTarget(c,t)).map(t=>`<button class="button button-attack" data-act="attack" data-id="${c.id}" data-target="${t.id}">공격 · ${esc(t.name)}</button>`).join("");actions+=roster.filter(t=>alive(t)&&canHealTarget(c,t)).map(t=>`<button class="button button-heal" data-act="heal" data-id="${c.id}" data-target="${t.id}">회복 · ${esc(t.name)}</button>`).join("");actions+=`<button class="button button-skill" data-act="skill" data-id="${c.id}">스킬</button><button class="button button-secondary" data-act="skip" data-id="${c.id}">차례 넘김</button><button class="button button-escape" data-act="escape" data-id="${c.id}">도주</button>`;}
   let reactions="";
-  if(target){reactions=`<div class="reaction-box"><strong>⚑ 반응 선택</strong><p>${esc(get(roster,pending.attackerId)?.name||"상대")}의 공격입니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="defense" data-id="${c.id}">방어</button><button class="button button-secondary" data-act="react" data-reaction="counter" data-id="${c.id}">반격</button><button class="button button-secondary" data-act="react" data-reaction="evasion" data-id="${c.id}">회피</button><button class="button button-quiet" data-act="react" data-reaction="none" data-id="${c.id}">무대응</button></div></div>`;}
+  if(target){reactions=`<div class="reaction-box"><strong>⚑ 반응 선택</strong><p>${esc(get(roster,pending.attackerId)?.name||"상대")}의 공격입니다.</p><div class="reaction-actions"><button class="button button-defense" data-act="react" data-reaction="defense" data-id="${c.id}">방어</button><button class="button button-counter" data-act="react" data-reaction="counter" data-id="${c.id}">반격</button><button class="button button-secondary" data-act="react" data-reaction="evasion" data-id="${c.id}">회피</button><button class="button button-quiet" data-act="react" data-reaction="none" data-id="${c.id}">무대응</button></div></div>`;}
   else if(protector&&alive(c)){reactions=`<div class="reaction-box ally-reaction"><strong>🛡 대신 방어</strong><p>${esc(get(roster,pending.targetId)?.name||"아군")}을 대신해 공격을 받을 수 있습니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="guard" data-id="${c.id}">대신 방어</button></div></div>`;}
-  return `<article class="character-card team-${c.team} ${current?"current-turn":""} ${target?"targeting":""} ${protector?"guarding":""} ${inactive?"inactive":""} ${c.dead?"dead":""}"><button class="card-delete" title="전투 인원에서 제외" data-act="remove-roster" data-id="${c.id}">×</button><button class="card-edit" title="캐릭터 스탯 수정" data-act="edit-roster" data-id="${c.id}">✎</button><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}${c.dead?'<span class="card-status">사망</span>':c.escaped?'<span class="card-status">도주</span>':""}</h4><p>${current?"현재 차례":inactive?"행동 불가":teamLabel(c.team)}</p><span class="team-tag">${teamLabel(c.team)}</span></div></div><div class="hp-meta"><span>체력</span><strong>${c.curHp} / ${c.maxHp}</strong></div><div class="hp-track"><div class="hp-fill ${pct<25?"low":""}" style="width:${pct}%"></div></div><div class="stat-chips">${stats.filter(s=>s.role!=="hp").map(s=>`<span class="stat-chip">${esc(s.name)} <b>${getCharacterStat(c,s)}</b></span>`).join("")}</div>${actions?`<div class="card-actions">${actions}</div>`:""}${reactions}</article>`;
+  return `<article style="--faction-color:${esc(factionColors[c.team]||"#667085")}" class="character-card team-${c.team} ${current?"current-turn":""} ${target?"targeting":""} ${protector?"guarding":""} ${inactive?"inactive":""} ${c.dead?"dead":""}"><button class="card-delete" title="전투 인원에서 제외" data-act="remove-roster" data-id="${c.id}">×</button><button class="card-edit" title="캐릭터 스탯 수정" data-act="edit-roster" data-id="${c.id}">✎</button><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}${c.dead?'<span class="card-status">사망</span>':c.escaped?'<span class="card-status">도주</span>':""}</h4><p>${current?`제 ${round} 라운드 · 현재 차례`:inactive?"행동 불가":""}</p><span class="team-tag">${teamLabel(c.team)}</span></div></div><div class="hp-meta"><span>체력</span><strong>${c.curHp} / ${c.maxHp}</strong></div><div class="hp-track"><div class="hp-fill ${pct<25?"low":""}" style="width:${pct}%"></div></div><div class="stat-chips">${stats.filter(s=>s.role!=="hp").map(s=>`<span class="stat-chip">${esc(s.name)} <b>${getCharacterStat(c,s)}</b></span>`).join("")}</div>${actions?`<div class="card-actions">${actions}</div>`:""}<div class="gm-actions"><button class="button button-gm" data-act="gm-heal" data-id="${c.id}">GM 회복</button><button class="button button-gm" data-act="gm-damage" data-id="${c.id}">GM HP 차감</button></div>${reactions}</article>`;
  };
  const groups=["A","B"].map(team=>{const list=roster.filter(c=>c.team===team);return `<section class="roster-faction team-${team}"><div class="roster-faction-header"><h3>${teamLabel(team)}</h3><span>${list.length}명</span></div><div class="character-grid">${list.length?list.map(renderCard).join(""):'<div class="empty-state compact-empty">이 진영의 전투 인원이 없습니다.</div>'}</div></section>`;}).join("");
  $("character-list").innerHTML=groups;
@@ -168,10 +169,11 @@ function resolveRuleRoll(c,kind){
 function agilityLevel(c){const s=stat(c,"agility");return getCharacterStat(c,s);}
 function agility(c){const s=stat(c,"agility");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?n:0;}
 // 민첩 대항: 양쪽이 자신의 AGI 범위에서 1회 굴림(1~AGI), 높은 값 승리. 동률은 재굴림.
-function contest(a,b){let guard=0;while(guard++<100){const aa=Math.max(1,agility(a)),bb=Math.max(1,agility(b));const ra=1+Math.floor(Math.random()*aa),rb=1+Math.floor(Math.random()*bb);log(`민첩 대항: ${a.name} ${ra}/${aa} vs ${b.name} ${rb}/${bb}`);if(ra!==rb)return ra>rb?a.id:b.id;}return agility(a)>=agility(b)?a.id:b.id;}
-function sortByAgility(){roster.sort((a,b)=>agility(b)-agility(a));}
-function rollInitiative(){const act=roster.filter(alive);if(act.length===1)return act[0].id;let winner=act[0];for(let i=1;i<act.length;i++){const c=act[i];if(agility(c)===agility(winner))winner=get(roster,contest(winner,c));}return winner.id;}
-function startBattle(){if(!roster.length){toast("전투 인원을 먼저 편성하세요.");return;}snap();started=true;pending=null;mode=$("initiative-mode").value;if(mode==="speed"){sortByAgility();let i=0;while(i<roster.length-1&&agility(roster[i])===agility(roster[i+1])){const w=contest(roster[i],roster[i+1]);if(w===roster[i+1].id){const tmp=roster[i];roster[i]=roster[i+1];roster[i+1]=tmp;}i++;}currentId=roster.find(alive)?.id;log("⚔ 전투 시작 · 민첩순. 민첩 동률만 대항 판정합니다.","system");}else{currentId=rollInitiative();log("⚔ 전투 시작 · 전체 생존자가 민첩 대항으로 선공을 결정합니다.","system");}log(`첫 차례: ${get(roster,currentId)?.name||"없음"}`);render();}
+function agilityDice(c){const s=stat(c,"agility");const n=clamp(Number(c.values?.[s?.id])||1,1,100);return 1+Math.floor(Math.random()*n);}
+function rollRoundOrder(){const active=roster.filter(alive);if(!active.length)return [];if(mode==="agility-dice"){const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');rolls.forEach(x=>log(`${get(roster,x.id).name}: 1d민첩(${getCharacterStat(get(roster,x.id),stat(get(roster,x.id),"agility"))}) → ${x.roll}`));rolls.sort((a,b)=>b.roll-a.roll);let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}for(const g of groups)if(g.length>1){for(let i=1;i<g.length;i++){const a=get(roster,g[i-1].id),b=get(roster,g[i].id),w=contest(a,b);if(w===b.id){const tmp=g[i-1];g[i-1]=g[i];g[i]=tmp;}}}roundOrder=groups.flat().map(x=>x.id);}else{roundOrder=active.slice().sort((a,b)=>agility(b)-agility(a)).map(c=>c.id);log(`◆ ${round}라운드 민첩순 정렬: ${roundOrder.map(x=>get(roster,x)?.name).join(" → ")}`,'system');}return roundOrder;}
+function contest(a,b){let guard=0;while(guard++<100){const ra=agilityDice(a),rb=agilityDice(b);log(`민첩 다이스 재판정: ${a.name} ${ra} vs ${b.name} ${rb}`);if(ra!==rb)return ra>rb?a.id:b.id;}return a.id;}
+function beginRound(){round++;roundOrder=rollRoundOrder();currentId=roundOrder.find(id=>alive(get(roster,id)))||null;log(`━━ ${round}라운드 시작 · ${get(roster,currentId)?.name||"없음"} 선공 ━━`,'system');}
+function startBattle(){if(!roster.length){toast("전투 인원을 먼저 편성하세요.");return;}snap();started=true;pending=null;round=0;roundOrder=[];mode=$("initiative-mode").value;beginRound();render();}
 function startAttack(aid,tid){const a=get(roster,aid),t=get(roster,tid);if(!started||!a||!t||aid!==currentId||!alive(a)||!alive(t))return;snap();pending={attackerId:aid,targetId:tid};log(`${a.name} → ${t.name} 공격 선언`);render();}
 function luck(c){const s=stat(c,"luck");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?Math.max(0,n):0;}
 function criticalRoll(c){
@@ -223,10 +225,12 @@ function react(defenderId,reaction){
  const winner=checkVictory();if(winner){started=false;currentId=null;render();return;}advanceTurn(action.attackerId);
 }
 function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const before=t.curHp;const amount=Math.max(0,Math.round(r.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`${c.name} → ${t.name} 치유: ${r.desc} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal");advanceTurn(cid);}
+function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;snap();const text=prompt(`${c.name}의 스킬 사용 내용을 GM 로그에 기록합니다.\n(스킬 효과 자체는 프로그램에서 처리하지 않습니다.)`);if(text===null)return;log(`${c.name} [스킬] ${text||"스킬 사용"}`,'important');advanceTurn(cid);}
+function gmHpAdjust(cid,sign){const c=get(roster,cid);if(!c)return;const raw=prompt(`${c.name} HP를 ${sign>0?"얼마나 회복":"얼마나 차감"}할까요?`,"10");if(raw===null)return;const amount=Math.max(0,Number(raw)||0);if(!amount){toast("0보다 큰 숫자를 입력하세요.");return;}snap();const before=c.curHp;c.curHp=clamp(c.curHp+sign*amount,0,c.maxHp);if(c.curHp>0)c.dead=false;else c.dead=true;log(`GM HP 조정 · ${c.name}: ${before} → ${c.curHp} (${sign>0?"회복":"차감"} ${amount})`,'system');render();}
 function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`${c.name} 도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success){c.escaped=true;log(`${c.name} 도주 성공`,"important");}else log(`${c.name} 도주 실패`);log(`▶ 도주 판정으로 ${c.name}의 차례 소모`);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
-function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}if(mode==="contest-each")currentId=rollInitiative();else{sortByAgility();const idx=roster.findIndex(c=>c.id===from);for(let i=1;i<=roster.length;i++){const c=roster[(Math.max(0,idx)+i)%roster.length];if(alive(c)){const prev=get(roster,from);currentId=(prev&&agility(c)===agility(prev))?contest(prev,c):c.id;break;}}}log(`▶ 다음 차례: ${get(roster,currentId)?.name||"없음"}`);render();}
+function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}const idx=roundOrder.indexOf(from);let next=null;for(let i=idx+1;i<roundOrder.length;i++){const c=get(roster,roundOrder[i]);if(alive(c)){next=c;break;}}if(next){currentId=next.id;}else{beginRound();}log(`▶ 다음 차례: ${get(roster,currentId)?.name||"없음"}`);render();}
 function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(roster.length>1&&active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");return w;}return null;}
-function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,factionNames,rules}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
+function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,round,roundOrder}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
 function exportSave(){const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="battle-desk-backup.json";a.click();URL.revokeObjectURL(a.href);}
 function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};migrateCharacters();renderStats();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
 function addStatRow(){snap();stats.forEach(s=>{s.defaults.push(s.defaults[s.defaults.length-1]??"");s.evasion=s.evasion||[];s.escape=s.escape||[];s.evasion.push(s.evasion[s.evasion.length-1]??0);s.escape.push(s.escape[s.escape.length-1]??0);});renderStats();render();toast(`${rowCount()}번째 스탯 단계를 추가했습니다.`);}
@@ -250,7 +254,7 @@ on("mapping-body","change",e=>{
 on("mapping-head","click",e=>{const b=e.target.closest("[data-remove-stat]");if(b)toast("기본 전투 능력치는 현재 삭제할 수 없습니다.");});
 on("add-stat-row","click",addStatRow);
 on("remove-stat-row","click",removeStatRow);
-on("character-list","click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const {act,id:cid,target,reaction}=b.dataset;if(act==="attack")startAttack(cid,target);else if(act==="heal")healAction(cid,target);else if(act==="react")react(cid,reaction);else if(act==="escape")escape(cid);else if(act==="skip")advanceTurn(cid);else if(act==="edit-roster")editRoster(cid);else if(act==="remove-roster"){snap();roster=roster.filter(c=>c.id!==cid);if(currentId===cid)currentId=null;pending=null;render();}});
+on("character-list","click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const {act,id:cid,target,reaction}=b.dataset;if(act==="attack")startAttack(cid,target);else if(act==="heal")healAction(cid,target);else if(act==="skill")skillAction(cid);else if(act==="gm-heal")gmHpAdjust(cid,1);else if(act==="gm-damage")gmHpAdjust(cid,-1);else if(act==="react")react(cid,reaction);else if(act==="escape")escape(cid);else if(act==="skip")advanceTurn(cid);else if(act==="edit-roster")editRoster(cid);else if(act==="remove-roster"){snap();roster=roster.filter(c=>c.id!==cid);if(currentId===cid)currentId=null;pending=null;render();}});
 on("start-battle","click",startBattle);
 on("next-turn","click",()=>{if(started&&!pending)advanceTurn(currentId);});
 on("undo","click",undo);
@@ -261,6 +265,10 @@ document.querySelectorAll("[data-library-filter]").forEach(b=>b.addEventListener
 on("initiative-mode","change",e=>{mode=e.target.value;save();});
 on("faction-a","change",e=>{factionNames.A=e.target.value.trim()||"A 진영";save();renderFactionControls();});
 on("faction-b","change",e=>{factionNames.B=e.target.value.trim()||"B 진영";save();renderFactionControls();});
+on("faction-a-color","input",e=>{factionColors.A=e.target.value;const h=$("faction-a-hex");if(h)h.value=e.target.value;save();render();});
+on("faction-b-color","input",e=>{factionColors.B=e.target.value;const h=$("faction-b-hex");if(h)h.value=e.target.value;save();render();});
+on("faction-a-hex","change",e=>{const v=e.target.value.trim();if(!validHex(v)){toast("A 진영 HEX는 #RRGGBB 형식이어야 합니다.");renderFactionControls();return;}factionColors.A=v.toLowerCase();save();render();});
+on("faction-b-hex","change",e=>{const v=e.target.value.trim();if(!validHex(v)){toast("B 진영 HEX는 #RRGGBB 형식이어야 합니다.");renderFactionControls();return;}factionColors.B=v.toLowerCase();save();render();});
 on("reset-config","click",()=>{if(confirm("기본 스탯 테이블로 초기화할까요?")){snap();stats=clone(DEFAULT_STATS);library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();}});
 on("export-save","click",exportSave);
 on("import-save","click",()=>{const el=$("import-file");if(el)el.click();});
@@ -273,6 +281,6 @@ on("clear-log","click",()=>{if(confirm("로그를 비울까요?")){logs=[];rende
 on("close-modal","click",()=>{$("modal-backdrop").hidden=true;});
 
 load();
-const initMode=$("initiative-mode");if(initMode)initMode.value=mode;
+if(mode==="contest-each")mode="agility-dice"; const initMode=$("initiative-mode");if(initMode)initMode.value=mode;
 renderStats();render();
 })();

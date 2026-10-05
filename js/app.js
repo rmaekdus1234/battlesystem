@@ -2,8 +2,8 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const clone=x=>JSON.parse(JSON.stringify(x));
-const KEY="battleDesk.custom.v6";
-const LEGACY_KEYS=["battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
+const KEY="battleDesk.custom.v7";
+const LEGACY_KEYS=["battleDesk.custom.v6","battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
 const DEFAULT_STATS=[
  {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180]},
  {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"]},
@@ -11,7 +11,7 @@ const DEFAULT_STATS=[
  {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45]},
  {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11]}
 ];
-let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", filter="all", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, rules={evasion:"roll-equal",escape:"roll-equal"}, toastTimer;
+let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, rules={evasion:"roll-equal",escape:"roll-equal"}, toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -114,7 +114,7 @@ function render(){
  renderLibrary();$("character-count").textContent=roster.length;$("battle-status").innerHTML=`<i></i> ${started?"전투 진행 중":"대기 중"}`;$("battle-status").classList.toggle("active",started);const cur=get(roster,currentId);
  $("turn-title").textContent=started?(cur?`${cur.name}의 차례`:"전투 종료"):"전투를 시작할 준비가 되었어요";$("turn-subtitle").textContent=started?(pending?`${get(roster,pending.targetId)?.name||"대상"}의 반응을 기다리는 중`:"행동을 선택하거나 차례를 넘기세요."):"전체 캐릭터를 만든 뒤 전투 인원으로 편성하세요.";
  $("next-turn").disabled=!started||!!pending||!cur;$("undo").disabled=!history.length;
- const list=roster.filter(c=>filter==="all"||c.team===filter);
+ const list=roster;
  $("character-list").innerHTML=list.length?list.map(c=>{
   const current=started&&c.id===currentId&&!pending,target=pending?.targetId===c.id,inactive=!alive(c),pct=clamp(c.curHp/c.maxHp*100,0,100);let actions="";
   if(current&&alive(c)){actions+=roster.filter(t=>t.id!==c.id&&alive(t)&&canTarget(c,t)).map(t=>`<button class="button button-attack" data-act="attack" data-id="${c.id}" data-target="${t.id}">공격 · ${esc(t.name)}</button>`).join("");actions+=`<button class="button button-secondary" data-act="skip" data-id="${c.id}">차례 넘김</button><button class="button button-escape" data-act="escape" data-id="${c.id}">도주</button>`;}
@@ -217,23 +217,44 @@ function addStatColumn(){toast("능력치 열 추가는 현재 기본 전투 능
 function clearBattle(){if(!confirm("전투 인원과 로그를 초기화할까요? 전체 캐릭터 목록은 유지됩니다."))return;snap();roster=[];logs=[];started=false;pending=null;currentId=null;render();toast("전투 상태를 초기화했습니다.");}
 function clearAll(){if(!confirm("전체 캐릭터와 능력치 설정을 초기화할까요?"))return;snap();stats=clone(DEFAULT_STATS);library=[];roster=[];logs=[];started=false;pending=null;currentId=null;renderStats();resetCharacterForm();render();toast("전체 초기화 완료");}
 
-$("character-form").addEventListener("submit",createCharacter);$("cancel-character-edit").addEventListener("click",resetCharacterForm);$("add-to-roster").addEventListener("click",addRoster);
-$("library-list").addEventListener("click",e=>{const ed=e.target.closest("[data-lib-edit]"),del=e.target.closest("[data-lib-delete]");if(ed)editCharacter(ed.dataset.libEdit);if(del&&confirm("전체 캐릭터 목록에서 삭제할까요?")){snap();library=library.filter(c=>c.id!==del.dataset.libDelete);roster=roster.filter(r=>r.libraryId!==del.dataset.libDelete);render();}});
-$("mapping-body").addEventListener("change",e=>{const el=e.target.closest("[data-stat]");if(!el)return;const s=stats.find(x=>x.id===el.dataset.stat),i=Number(el.dataset.row);if(!s)return;snap();s.defaults[i]=s.type==="number"?(s.role==="hp"?Math.max(1,Number(el.value)||1):Number(el.value)||0):el.value;library.forEach(c=>{if(c.levels?.[s.id]===i+1)syncCharacter(c,true);});roster.forEach(c=>{if(c.levels?.[s.id]===i+1)syncCharacter(c,true);});render();});
-$("mapping-head").addEventListener("click",e=>{const b=e.target.closest("[data-remove-stat]");if(b)toast("기본 전투 능력치는 현재 삭제할 수 없습니다.");});
-$("add-stat-row").addEventListener("click",addStatRow);$("remove-stat-row").addEventListener("click",removeStatRow);
-$("character-list").addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const {act,id:cid,target,reaction}=b.dataset;if(act==="attack")startAttack(cid,target);if(act==="react")react(cid,reaction);if(act==="escape")escape(cid);if(act==="skip")advanceTurn(cid);if(act==="edit-roster")editRoster(cid);if(act==="remove-roster"){snap();roster=roster.filter(c=>c.id!==cid);if(currentId===cid)currentId=null;pending=null;render();}});
-$("start-battle").addEventListener("click",startBattle);$("next-turn").addEventListener("click",()=>{if(started&&!pending)advanceTurn(currentId);});$("undo").addEventListener("click",undo);
-document.querySelectorAll("[data-filter]").forEach(b=>b.addEventListener("click",()=>{filter=b.dataset.filter;document.querySelectorAll("[data-filter]").forEach(x=>x.classList.toggle("active",x===b));render();}));
-document.querySelectorAll("[data-library-filter]").forEach(b=>b.addEventListener("click",()=>{libraryFilter=b.dataset.libraryFilter;document.querySelectorAll("[data-library-filter]").forEach(x=>x.classList.toggle("active",x===b));render();}));
-$("initiative-mode").addEventListener("change",e=>{mode=e.target.value;save();});
-$("faction-a").addEventListener("change",e=>{factionNames.A=e.target.value.trim()||"A 진영";save();render();});
-$("faction-b").addEventListener("change",e=>{factionNames.B=e.target.value.trim()||"B 진영";save();render();});
-$("evasion-rule").addEventListener("change",e=>{rules.evasion=e.target.value;save();});
-$("escape-rule").addEventListener("change",e=>{rules.escape=e.target.value;save();});
-$("reset-config").addEventListener("click",()=>{if(confirm("기본 스탯 테이블로 초기화할까요?")){snap();stats=clone(DEFAULT_STATS);library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();}});
-$("export-save").addEventListener("click",exportSave);$("import-save").addEventListener("click",()=>$("import-file").click());$("import-file").addEventListener("change",e=>{if(e.target.files[0])importSave(e.target.files[0]);});$("clear-battle").addEventListener("click",clearBattle);$("clear-all").addEventListener("click",clearAll);
-$("download-log").addEventListener("click",()=>{const a=document.createElement("a"),blob=new Blob([logs.map(x=>`[${x.time}] ${x.message}`).join("\n")],{type:"text/plain;charset=utf-8"});a.href=URL.createObjectURL(blob);a.download="battle-log.txt";a.click();URL.revokeObjectURL(a.href);});
-$("copy-log").addEventListener("click",async()=>{try{await navigator.clipboard.writeText(logs.map(x=>`[${x.time}] ${x.message}`).join("\n"));toast("로그 복사 완료");}catch(e){toast("복사할 수 없습니다");}});$("clear-log").addEventListener("click",()=>{if(confirm("로그를 비울까요?")){logs=[];renderLogs();save();}});$("close-modal").addEventListener("click",()=>$("modal-backdrop").hidden=true);
-load();$("initiative-mode").value=mode;renderStats();render();
+function on(id,event,handler){const el=$(id);if(el)el.addEventListener(event,handler);}
+
+// 정적 버튼과 동적으로 다시 그려지는 버튼을 모두 안전하게 처리합니다.
+on("character-form","submit",createCharacter);
+on("cancel-character-edit","click",resetCharacterForm);
+on("add-to-roster","click",addRoster);
+on("library-list","click",e=>{const ed=e.target.closest("[data-lib-edit]"),del=e.target.closest("[data-lib-delete]");if(ed)editCharacter(ed.dataset.libEdit);if(del&&confirm("전체 캐릭터 목록에서 삭제할까요?")){snap();library=library.filter(c=>c.id!==del.dataset.libDelete);roster=roster.filter(r=>r.libraryId!==del.dataset.libDelete);render();}});
+on("mapping-body","change",e=>{const el=e.target.closest("[data-stat]");if(!el)return;const s=stats.find(x=>x.id===el.dataset.stat),i=Number(el.dataset.row);if(!s||!Number.isInteger(i)||i<0||i>=s.defaults.length)return;snap();s.defaults[i]=s.type==="number"?(s.role==="hp"?Math.max(1,Number(el.value)||1):Number(el.value)||0):el.value;library.forEach(c=>{if(c.levels?.[s.id]===i+1)syncCharacter(c,true);});roster.forEach(c=>{if(c.levels?.[s.id]===i+1)syncCharacter(c,true);});render();});
+on("mapping-head","click",e=>{const b=e.target.closest("[data-remove-stat]");if(b)toast("기본 전투 능력치는 현재 삭제할 수 없습니다.");});
+on("add-stat-row","click",addStatRow);
+on("remove-stat-row","click",removeStatRow);
+on("character-list","click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const {act,id:cid,target,reaction}=b.dataset;if(act==="attack")startAttack(cid,target);else if(act==="react")react(cid,reaction);else if(act==="escape")escape(cid);else if(act==="skip")advanceTurn(cid);else if(act==="edit-roster")editRoster(cid);else if(act==="remove-roster"){snap();roster=roster.filter(c=>c.id!==cid);if(currentId===cid)currentId=null;pending=null;render();}});
+on("start-battle","click",startBattle);
+on("next-turn","click",()=>{if(started&&!pending)advanceTurn(currentId);});
+on("undo","click",undo);
+
+// 전체 캐릭터 목록에만 진영 필터를 제공합니다. 전투 인원에는 필터를 두지 않습니다.
+document.querySelectorAll("[data-library-filter]").forEach(b=>b.addEventListener("click",()=>{libraryFilter=b.dataset.libraryFilter||"all";document.querySelectorAll("[data-library-filter]").forEach(x=>x.classList.toggle("active",x===b));renderLibrary();}));
+
+on("initiative-mode","change",e=>{mode=e.target.value;save();});
+on("faction-a","change",e=>{factionNames.A=e.target.value.trim()||"A 진영";save();renderFactionControls();});
+on("faction-b","change",e=>{factionNames.B=e.target.value.trim()||"B 진영";save();renderFactionControls();});
+on("evasion-rule","change",e=>{rules.evasion=e.target.value;save();});
+on("escape-rule","change",e=>{rules.escape=e.target.value;save();});
+on("reset-config","click",()=>{if(confirm("기본 스탯 테이블로 초기화할까요?")){snap();stats=clone(DEFAULT_STATS);library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();}});
+on("export-save","click",exportSave);
+on("import-save","click",()=>{const el=$("import-file");if(el)el.click();});
+on("import-file","change",e=>{if(e.target.files[0])importSave(e.target.files[0]);e.target.value="";});
+on("clear-battle","click",clearBattle);
+on("clear-all","click",clearAll);
+on("download-log","click",()=>{const a=document.createElement("a"),blob=new Blob([logs.map(x=>`[${x.time}] ${x.message}`).join("\n")],{type:"text/plain;charset=utf-8"});a.href=URL.createObjectURL(blob);a.download="battle-log.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0);});
+on("copy-log","click",async()=>{try{const text=logs.map(x=>`[${x.time}] ${x.message}`).join("\n");if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}toast("로그 복사 완료");}catch(e){toast("복사할 수 없습니다");}});
+on("clear-log","click",()=>{if(confirm("로그를 비울까요?")){logs=[];renderLogs();save();}});
+on("close-modal","click",()=>{$("modal-backdrop").hidden=true;});
+
+load();
+const initMode=$("initiative-mode");if(initMode)initMode.value=mode;
+const initEvasion=$("evasion-rule");if(initEvasion)initEvasion.value=rules.evasion;
+const initEscape=$("escape-rule");if(initEscape)initEscape.value=rules.escape;
+renderStats();render();
 })();

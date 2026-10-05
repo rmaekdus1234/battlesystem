@@ -5,13 +5,13 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const KEY="battleDesk.custom.v7";
 const LEGACY_KEYS=["battleDesk.custom.v6","battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
 const DEFAULT_STATS=[
- {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180]},
- {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"]},
- {id:"def",name:"방어(DEF)",type:"number",role:"defense",defaults:[10,20,30,40,50]},
- {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45]},
- {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11]}
+ {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180],evasion:[100,100,100,100,100],escape:[100,100,100,100,100]},
+ {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
+ {id:"def",name:"방어(DEF)",type:"number",role:"defense",defaults:[10,20,30,40,50],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
+ {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45],evasion:[5,15,25,35,45],escape:[5,15,25,35,45]},
+ {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]}
 ];
-let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, rules={evasion:"roll-equal",escape:"roll-equal"}, toastTimer;
+let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -20,7 +20,7 @@ const alive=c=>!!c&&!c.dead&&!c.escaped;
 const stat=(c,role)=>stats.find(s=>s.role===role);
 const rowCount=()=>Math.max(1,...stats.map(s=>s.defaults.length));
 
-function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames,rules});}
+function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames});}
 function save(){
  try{
   const payload=JSON.stringify(snapshot());
@@ -39,7 +39,7 @@ function load(){
   if(!raw){stats=clone(DEFAULT_STATS);return;}
   const d=JSON.parse(raw);
   stats=normalizeStats(d.stats||clone(DEFAULT_STATS)); library=Array.isArray(d.library)?d.library:[]; roster=Array.isArray(d.roster)?d.roster:[];
-  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; rules={evasion:d.rules?.evasion||"roll-equal",escape:d.rules?.escape||"roll-equal"};
+  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; 
   migrateCharacters();
  }catch(e){console.warn("저장 데이터 불러오기 실패",e);}
 }
@@ -54,6 +54,10 @@ function normalizeStats(source){
   // 기본값은 항상 최소 5줄을 유지하고, 사용자가 추가한 단계는 뒤에 보존합니다.
   if(vals.length>=5)target.defaults=vals.slice(0,100);
   else if(vals.length>0)target.defaults=target.defaults.map((v,i)=>vals[i]!==undefined?vals[i]:v);
+  target.evasion=Array.isArray(saved.evasion)?saved.evasion.slice(0,100):Array.from({length:target.defaults.length},(_,i)=>target.defaults[i]);
+  target.escape=Array.isArray(saved.escape)?saved.escape.slice(0,100):Array.from({length:target.defaults.length},(_,i)=>target.defaults[i]);
+  while(target.evasion.length<target.defaults.length)target.evasion.push(target.evasion[target.evasion.length-1]??target.defaults[target.evasion.length-1]??0);
+  while(target.escape.length<target.defaults.length)target.escape.push(target.escape[target.escape.length-1]??target.defaults[target.escape.length-1]??0);
  });
  const n=Math.max(5,...result.map(s=>s.defaults.length));
  result.forEach(s=>{while(s.defaults.length<n)s.defaults.push(s.defaults[s.defaults.length-1]??"");});
@@ -92,8 +96,8 @@ function renderFactionControls(){
 }
 function renderStats(){
  const n=rowCount();
- $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role!=="hp"?` <button title="이 능력치 열 삭제" data-remove-stat="${s.id}">×</button>`:""}</th>`).join("")}</tr>`;
- $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" ${s.type==="number"?'type="number"':'type="text"'}></td>`).join("")}</tr>`).join("");
+ $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role!=="hp"?` <button title="이 능력치 열 삭제" data-remove-stat="${s.id}">×</button>`:""}</th>`).join("")}<th>회피</th><th>도주</th></tr>`;
+ $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" ${s.type==="number"?'type="number"':'type="text"'}></td>`).join("")}<td><input type="number" min="0" data-rule="evasion" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.evasion?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td><td><input type="number" min="0" data-rule="escape" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.escape?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td></tr>`).join("");
  $("custom-stat-fields").innerHTML=stats.map(s=>`<label>${esc(s.name)} <span>스탯 1~${n}</span><input class="wide-input" data-character-stat="${s.id}" type="number" min="1" max="${n}" step="1" value="1" required></label>`).join("");
 }
 function setFormFromCharacter(c){
@@ -128,7 +132,7 @@ function createCharacter(e){
  e.preventDefault();
  const name=$("char-name").value.trim();if(!name){toast("이름을 입력하세요.");return;}
  const levels={},values={};const n=rowCount();
- for(const s of stats){const el=$(`[data-character-stat="${s.id}"]`);const lv=clamp(Number(el?.value)||1,1,n);levels[s.id]=lv;values[s.id]=getStatValue(s,lv);}
+ for(const s of stats){const el=document.querySelector(`[data-character-stat="${s.id}"]`);const raw=el?.value?.trim();const parsed=Number.parseInt(raw,10);const lv=clamp(Number.isFinite(parsed)?parsed:1,1,n);levels[s.id]=lv;values[s.id]=getStatValue(s,lv);}
  const editId=$("character-form").dataset.edit;
  snap();
  if(editId){
@@ -144,11 +148,15 @@ function createCharacter(e){
 function editCharacter(cid){const c=get(library,cid);if(c)setFormFromCharacter(c);}
 function editRoster(cid){const r=get(roster,cid);if(!r)return;const base=get(library,r.libraryId);if(base)setFormFromCharacter(base);}
 function addRoster(){const c=get(library,$("library-select").value);if(!c){toast("전투에 추가할 캐릭터를 선택하세요.");return;}if(roster.some(r=>r.libraryId===c.id)){toast("이미 전투 인원에 있습니다.");return;}snap();syncCharacter(c,true);roster.push({...clone(c),id:makeId("r"),libraryId:c.id,curHp:c.maxHp,dead:false,escaped:false});render();toast(`${c.name}을(를) 전투 인원에 추가했습니다.`);}
-function resolveAgilityRoll(c,rule){
- const ag=Math.max(1,agility(c));
- if(rule==="d100-under")return {roll:1+Math.floor(Math.random()*100),max:100,success:null};
- return {roll:1+Math.floor(Math.random()*ag),max:ag,success:null};
+function resolveRuleRoll(c,kind){
+ const ag=agility(c);
+ const s=stat(c,"agility");
+ const table=kind==="evasion"?s?.evasion:s?.escape;
+ const threshold=Math.max(0,Number(table?.[Math.max(0,agilityLevel(c)-1)])||0);
+ const rollValue=1+Math.floor(Math.random()*100);
+ return {roll:rollValue,max:100,threshold,success:rollValue<=threshold};
 }
+function agilityLevel(c){const s=stat(c,"agility");return getCharacterStat(c,s);}
 function agility(c){const s=stat(c,"agility");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?n:0;}
 // 민첩 대항: 양쪽이 자신의 AGI 범위에서 1회 굴림(1~AGI), 높은 값 승리. 동률은 재굴림.
 function contest(a,b){let guard=0;while(guard++<100){const aa=Math.max(1,agility(a)),bb=Math.max(1,agility(b));const ra=1+Math.floor(Math.random()*aa),rb=1+Math.floor(Math.random()*bb);log(`민첩 대항: ${a.name} ${ra}/${aa} vs ${b.name} ${rb}/${bb}`);if(ra!==rb)return ra>rb?a.id:b.id;}return agility(a)>=agility(b)?a.id:b.id;}
@@ -172,12 +180,8 @@ function applyCritical(value,c,kind){
  return {value:result,critical:cr};
 }
 function applyDamage(c,amount,label){const before=c.curHp;c.curHp=clamp(c.curHp-Math.max(0,Math.round(amount)),0,c.maxHp);log(`${c.name} ${label}: ${before-c.curHp} 피해 (HP ${before} → ${c.curHp})`,"damage");if(c.curHp<=0){c.dead=true;log(`${c.name} 전투 불능`,"important");}}
-function evasionCheck(c){
- const r=resolveAgilityRoll(c,rules.evasion);const ag=agility(c);r.success=rules.evasion==="d100-under"?r.roll<=ag:r.roll===ag;return r;
-}
-function escapeCheck(c){
- const r=resolveAgilityRoll(c,rules.escape);const ag=agility(c);r.success=rules.escape==="d100-under"?r.roll<=ag:r.roll===ag;return r;
-}
+function evasionCheck(c){return resolveRuleRoll(c,"evasion");}
+function escapeCheck(c){return resolveRuleRoll(c,"escape");}
 function react(defenderId,reaction){
  if(!pending||pending.targetId!==defenderId)return;
  const a=get(roster,pending.attackerId),d=get(roster,defenderId);if(!a||!d)return;
@@ -201,18 +205,18 @@ function react(defenderId,reaction){
   log(`${d.name} 반격: 방어 ${pct}% → ${counter} 피해 경감 및 반사 피해 ${counter}`);
   applyDamage(d,attack-counter,"반격 후");if(alive(a))applyDamage(a,counter,"반격 피해");
  }else if(reaction==="evasion"){
-  const r=evasionCheck(d);log(`${d.name} 회피 판정: ${r.roll}/${r.max} · ${rules.evasion==="d100-under"?`1d100 ≤ AGI(${agility(d)})`:`1dAGI = AGI(${agility(d)})`}`);if(r.success)log(`${d.name} 회피 성공`,"important");else applyDamage(d,attack,"회피 실패 후");
+  const r=evasionCheck(d);log(`${d.name} 회피 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success)log(`${d.name} 회피 성공`,"important");else applyDamage(d,attack,"회피 실패 후");
  }else applyDamage(d,attack,"피해");
  const winner=checkVictory();if(winner){started=false;currentId=null;render();return;}advanceTurn(action.attackerId);
 }
-function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`${c.name} 도주 판정 ${r.roll}/${r.max} · ${rules.escape==="d100-under"?`1d100 ≤ AGI(${agility(c)})`:`1dAGI = AGI(${agility(c)})`}`);if(r.success){c.escaped=true;log(`${c.name} 도주 성공`,"important");}else log(`${c.name} 도주 실패`);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
+function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`${c.name} 도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success){c.escaped=true;log(`${c.name} 도주 성공`,"important");}else log(`${c.name} 도주 실패`);log(`▶ 도주 판정으로 ${c.name}의 차례 소모`);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
 function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}if(mode==="contest-each")currentId=rollInitiative();else{sortByAgility();const idx=roster.findIndex(c=>c.id===from);for(let i=1;i<=roster.length;i++){const c=roster[(Math.max(0,idx)+i)%roster.length];if(alive(c)){const prev=get(roster,from);currentId=(prev&&agility(c)===agility(prev))?contest(prev,c):c.id;break;}}}log(`▶ 다음 차례: ${get(roster,currentId)?.name||"없음"}`);render();}
 function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(roster.length>1&&active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");return w;}return null;}
 function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,factionNames,rules}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
 function exportSave(){const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="battle-desk-backup.json";a.click();URL.revokeObjectURL(a.href);}
-function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};rules={evasion:d.rules?.evasion||"roll-equal",escape:d.rules?.escape||"roll-equal"};migrateCharacters();renderStats();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
-function addStatRow(){snap();stats.forEach(s=>s.defaults.push(s.defaults[s.defaults.length-1]??""));renderStats();render();toast(`${rowCount()}번째 스탯 단계를 추가했습니다.`);}
-function removeStatRow(){const n=rowCount();if(n<=1){toast("최소 1줄은 유지해야 합니다.");return;}snap();stats.forEach(s=>s.defaults.pop());library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();toast("마지막 스탯 단계를 삭제했습니다.");}
+function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};migrateCharacters();renderStats();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
+function addStatRow(){snap();stats.forEach(s=>{s.defaults.push(s.defaults[s.defaults.length-1]??"");s.evasion=s.evasion||[];s.escape=s.escape||[];s.evasion.push(s.evasion[s.evasion.length-1]??0);s.escape.push(s.escape[s.escape.length-1]??0);});renderStats();render();toast(`${rowCount()}번째 스탯 단계를 추가했습니다.`);}
+function removeStatRow(){const n=rowCount();if(n<=1){toast("최소 1줄은 유지해야 합니다.");return;}snap();stats.forEach(s=>{s.defaults.pop();if(s.evasion?.length)s.evasion.pop();if(s.escape?.length)s.escape.pop();});library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();toast("마지막 스탯 단계를 삭제했습니다.");}
 function addStatColumn(){toast("능력치 열 추가는 현재 기본 전투 능력치 5종을 기준으로 합니다.");}
 function clearBattle(){if(!confirm("전투 인원과 로그를 초기화할까요? 전체 캐릭터 목록은 유지됩니다."))return;snap();roster=[];logs=[];started=false;pending=null;currentId=null;render();toast("전투 상태를 초기화했습니다.");}
 function clearAll(){if(!confirm("전체 캐릭터와 능력치 설정을 초기화할까요?"))return;snap();stats=clone(DEFAULT_STATS);library=[];roster=[];logs=[];started=false;pending=null;currentId=null;renderStats();resetCharacterForm();render();toast("전체 초기화 완료");}
@@ -224,7 +228,11 @@ on("character-form","submit",createCharacter);
 on("cancel-character-edit","click",resetCharacterForm);
 on("add-to-roster","click",addRoster);
 on("library-list","click",e=>{const ed=e.target.closest("[data-lib-edit]"),del=e.target.closest("[data-lib-delete]");if(ed)editCharacter(ed.dataset.libEdit);if(del&&confirm("전체 캐릭터 목록에서 삭제할까요?")){snap();library=library.filter(c=>c.id!==del.dataset.libDelete);roster=roster.filter(r=>r.libraryId!==del.dataset.libDelete);render();}});
-on("mapping-body","change",e=>{const el=e.target.closest("[data-stat]");if(!el)return;const s=stats.find(x=>x.id===el.dataset.stat),i=Number(el.dataset.row);if(!s||!Number.isInteger(i)||i<0||i>=s.defaults.length)return;snap();s.defaults[i]=s.type==="number"?(s.role==="hp"?Math.max(1,Number(el.value)||1):Number(el.value)||0):el.value;library.forEach(c=>{if(c.levels?.[s.id]===i+1)syncCharacter(c,true);});roster.forEach(c=>{if(c.levels?.[s.id]===i+1)syncCharacter(c,true);});render();});
+on("mapping-body","change",e=>{
+ const el=e.target;const i=Number(el.dataset.row);if(!Number.isInteger(i)||i<0)return;
+ if(el.matches("[data-rule]")){snap();const s=stats.find(x=>x.role==="agility");if(!s)return;s.evasion=s.evasion||Array(s.defaults.length).fill(0);s.escape=s.escape||Array(s.defaults.length).fill(0);const v=Math.max(0,Number(el.value)||0);if(el.dataset.rule==="evasion")s.evasion[i]=v;else s.escape[i]=v;save();renderStats();return;}
+ const key=el.dataset.stat;if(!key)return;const s=stats.find(x=>x.id===key);if(!s||i>=s.defaults.length)return;snap();s.defaults[i]=s.type==="number"?(s.role==="hp"?Math.max(1,Number(el.value)||1):Number(el.value)||0):el.value;library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));render();
+});
 on("mapping-head","click",e=>{const b=e.target.closest("[data-remove-stat]");if(b)toast("기본 전투 능력치는 현재 삭제할 수 없습니다.");});
 on("add-stat-row","click",addStatRow);
 on("remove-stat-row","click",removeStatRow);
@@ -239,8 +247,6 @@ document.querySelectorAll("[data-library-filter]").forEach(b=>b.addEventListener
 on("initiative-mode","change",e=>{mode=e.target.value;save();});
 on("faction-a","change",e=>{factionNames.A=e.target.value.trim()||"A 진영";save();renderFactionControls();});
 on("faction-b","change",e=>{factionNames.B=e.target.value.trim()||"B 진영";save();renderFactionControls();});
-on("evasion-rule","change",e=>{rules.evasion=e.target.value;save();});
-on("escape-rule","change",e=>{rules.escape=e.target.value;save();});
 on("reset-config","click",()=>{if(confirm("기본 스탯 테이블로 초기화할까요?")){snap();stats=clone(DEFAULT_STATS);library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();}});
 on("export-save","click",exportSave);
 on("import-save","click",()=>{const el=$("import-file");if(el)el.click();});
@@ -254,7 +260,5 @@ on("close-modal","click",()=>{$("modal-backdrop").hidden=true;});
 
 load();
 const initMode=$("initiative-mode");if(initMode)initMode.value=mode;
-const initEvasion=$("evasion-rule");if(initEvasion)initEvasion.value=rules.evasion;
-const initEscape=$("escape-rule");if(initEscape)initEscape.value=rules.escape;
 renderStats();render();
 })();

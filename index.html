@@ -37,14 +37,11 @@
 <button id="undo" class="button button-quiet">↶ 마지막 행동 되돌리기</button>
 </div>
 <p class="helper-text">전투 인원 목록에 추가된 캐릭터만 전투에 참여합니다. 진영명은 저장되며 캐릭터 목록과 전투 화면에 함께 적용됩니다.</p>
-<div class="field-grid">
-<label>회피 판정 <span>AGI 사용</span><select id="evasion-rule"><option value="roll-equal">1dAGI = AGI</option><option value="d100-under">1d100 ≤ AGI</option></select></label>
-<label>도주 판정 <span>AGI 사용</span><select id="escape-rule"><option value="roll-equal">1dAGI = AGI</option><option value="d100-under">1d100 ≤ AGI</option></select></label>
-</div>
+<p class="helper-text">회피와 도주는 민첩(AGI) 스탯 단계를 기준으로 아래 능력치 테이블의 <b>회피 / 도주</b> 값을 각각 사용합니다. 두 판정은 서로 독립적으로 수정할 수 있으며, 도주 역시 판정 후 해당 캐릭터의 턴을 소모합니다.</p>
 </section>
 <section class="panel">
 <div class="section-heading"><span class="section-index">03</span><h2>능력치 테이블</h2></div>
-<p class="helper-text">행은 스탯 번호이며, 기본 5단계입니다. 각 능력치 열의 값을 직접 설정할 수 있습니다. 행운(LUK)은 크리티컬 확률(%)입니다.</p>
+<p class="helper-text">행은 스탯 번호이며, 기본 5단계입니다. 각 능력치 열과 회피·도주 값을 직접 설정할 수 있습니다. 회피와 도주는 민첩(AGI)의 스탯 단계에 대응합니다. 행운(LUK)은 크리티컬 확률(%)입니다.</p>
 <div class="table-scroll"><table class="stat-table"><thead id="mapping-head"></thead><tbody id="mapping-body"></tbody></table></div>
 <p class="small-note">기본 능력치는 체력(HP), 공격(ATK), 방어(DEF), 민첩(AGI), 행운(LUK) 5종입니다. 스탯 단계를 추가하면 캐릭터 생성 화면의 입력 범위도 함께 늘어납니다.</p>
 <div class="button-grid"><button id="add-stat-row" class="button button-secondary">＋ 스탯 단계 추가</button><button id="remove-stat-row" class="button button-quiet">－ 마지막 단계 삭제</button></div><button id="reset-config" class="button button-quiet full-width" style="margin-top:7px">기본 스탯값으로 초기화</button>
@@ -69,4 +66,4 @@
 <aside class="log-sidebar"><div class="log-header"><div><p class="eyebrow">COMBAT RECORD</p><h2>전투 로그</h2></div><span id="log-count" class="count-badge">0</span></div><div class="log-tools"><button id="download-log" class="button button-secondary">TXT 추출</button><button id="copy-log" class="button button-quiet">로그 복사</button><button id="clear-log" class="button button-quiet">로그 비우기</button></div><div id="log-container" class="log-container" aria-live="polite"><div class="log-empty">전투 기록이 여기에 쌓입니다.</div></div><div class="log-footer"><span class="live-dot"></span> 브라우저에 자동 저장 중 <span id="save-indicator">저장됨</span></div></aside>
 </div><div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="modal-backdrop" class="modal-backdrop" hidden><section class="modal" role="dialog" aria-modal="true"><div class="modal-top"><p class="eyebrow">ACTION REQUIRED</p><button id="close-modal" class="icon-button">×</button></div><h2 id="modal-title">반응 선택</h2><p id="modal-description"></p><div id="modal-actions" class="modal-actions"></div></section></div>
-<script src="js/app.js?v=7"></script></body></html>
+<script src="js/app.js?v=8"></script></body></html>

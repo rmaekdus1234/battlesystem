@@ -1,132 +1,64 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#171a23">
-  <title>Battle Desk | 전투 시뮬레이터</title>
-  <link rel="stylesheet" href="css/style.css">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#171a23"><title>Battle Desk | 전투 시뮬레이터</title>
+<link rel="stylesheet" href="css/style.css">
+<style>
+.library-list{display:grid;gap:8px}.library-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel-soft,#202431)}.library-item small{display:block;color:var(--muted)}.library-item button{white-space:nowrap}.wide-input{width:100%;min-width:100px}.stat-table input{min-width:78px}.table-scroll{overflow:auto}.section-heading h2{margin:0}.small-note{font-size:12px;color:var(--muted);line-height:1.5}.roster-split{display:grid;grid-template-columns:1fr 1fr;gap:14px}.roster-split h3{margin-bottom:10px}.roster-box{border:1px solid var(--line);border-radius:12px;padding:12px;min-width:0}.roster-box .button{margin-top:6px}.inline-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.inline-controls select{flex:1;min-width:160px}@media(max-width:800px){.roster-split{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <header class="brand">
-        <div class="brand-mark">BD</div>
-        <div><p class="eyebrow">TABLETOP COMBAT TOOL</p><h1>Battle Desk</h1></div>
-      </header>
-
-      <section class="panel">
-        <div class="section-heading"><span class="section-index">01</span><h2>캐릭터 등록</h2></div>
-        <form id="character-form">
-          <label class="field-label" for="char-name">이름</label>
-          <input id="char-name" name="name" placeholder="캐릭터 이름" maxlength="50" autocomplete="off">
-          <div class="field-grid">
-            <label>공격 등급 <span>ATK</span><select id="char-atk"></select></label>
-            <label>체력 등급 <span>HP</span><select id="char-hp"></select></label>
-            <label>방어 등급 <span>DEF</span><select id="char-def"></select></label>
-            <label>민첩 등급 <span>AGI</span><select id="char-agi"></select></label>
-            <label>지능 등급 <span>INT</span><select id="char-int"></select></label>
-            <label>진영 <span>TEAM</span><select id="char-team"><option value="A">A 진영</option><option value="B">B 진영</option><option value="N">중립</option></select></label>
-          </div>
-          <button class="button button-primary full-width" type="submit">＋ 캐릭터 추가</button>
-        </form>
-      </section>
-
-      <section class="panel">
-        <div class="section-heading"><span class="section-index">02</span><h2>전투 설정</h2></div>
-        <label class="setting-row">기본 회복량 <input id="heal-amount" type="number" min="0" max="9999" value="20"></label>
-        <label class="setting-row">도주 보정치 (%) <input id="escape-bonus" type="number" min="0" max="100" value="10"></label>
-        <div class="button-stack">
-          <button id="start-battle" class="button button-primary">민첩순 전투 시작</button>
-          <button id="next-turn" class="button button-secondary">차례 넘기기 <span>↗</span></button>
-          <button id="undo" class="button button-quiet">↶ 마지막 행동 되돌리기</button>
-        </div>
-        <p class="helper-text">전투 행동은 되돌리기 기록에 저장됩니다.</p>
-      </section>
-
-      <section class="panel">
-        <div class="section-heading"><span class="section-index">03</span><h2>능력치 테이블</h2></div>
-        <p class="helper-text">등급별 수치를 직접 수정할 수 있어요. 변경 사항은 이 브라우저에 저장됩니다.</p>
-        <div class="table-scroll">
-          <table class="stat-table">
-            <thead><tr><th>등급</th><th>최대 HP</th><th>공격 주사위</th><th>방어%</th><th>회피%</th><th>INT 배율</th></tr></thead>
-            <tbody id="mapping-body"></tbody>
-          </table>
-        </div>
-        <button id="reset-config" class="button button-quiet full-width">기본 능력치로 초기화</button>
-      </section>
-
-      <section class="panel data-panel">
-        <div class="section-heading"><span class="section-index">04</span><h2>데이터 관리</h2></div>
-        <div class="button-grid">
-          <button id="export-save" class="button button-secondary">백업 내보내기</button>
-          <button id="import-save" class="button button-secondary">백업 불러오기</button>
-          <button id="clear-battle" class="button button-quiet">전투 초기화</button>
-          <button id="clear-all" class="button button-danger-quiet">전체 초기화</button>
-        </div>
-        <input id="import-file" type="file" accept="application/json,.json" hidden>
-        <p class="helper-text">캐릭터와 설정을 JSON 파일로 백업하거나 다른 브라우저에서 불러올 수 있습니다.</p>
-      </section>
-      <footer class="sidebar-footer">BATTLE DESK <span>·</span> GitHub Pages ready</footer>
-    </aside>
-
-    <main class="battle-main">
-      <div class="topbar">
-        <div>
-          <p class="eyebrow">ENCOUNTER CONTROL</p>
-          <h2>전장 현황</h2>
-        </div>
-        <div class="topbar-actions">
-          <span id="battle-status" class="status-pill"><i></i> 대기 중</span>
-          <button id="sort-speed" class="button button-secondary compact">민첩순 정렬</button>
-        </div>
-      </div>
-
-      <section class="turn-banner" id="turn-banner">
-        <div class="turn-symbol">✦</div>
-        <div><p class="eyebrow">CURRENT TURN</p><h3 id="turn-title">전투를 시작할 준비가 되었어요</h3><p id="turn-subtitle">캐릭터를 등록한 뒤 민첩순 전투 시작을 눌러주세요.</p></div>
-      </section>
-
-      <div class="roster-toolbar">
-        <div><h3>참가 캐릭터 <span id="character-count" class="count-badge">0</span></h3><p>카드에서 공격 대상을 선택하고 행동을 진행하세요.</p></div>
-        <div class="filter-group" role="group" aria-label="캐릭터 필터">
-          <button class="filter-button active" data-filter="all">전체</button>
-          <button class="filter-button" data-filter="A">A 진영</button>
-          <button class="filter-button" data-filter="B">B 진영</button>
-          <button class="filter-button" data-filter="N">중립</button>
-        </div>
-      </div>
-
-      <div id="character-list" class="character-grid">
-        <div class="empty-state"><div class="empty-icon">✦</div><h3>전장이 비어 있습니다</h3><p>왼쪽에서 첫 번째 캐릭터를 등록해 주세요.</p></div>
-      </div>
-
-      <section class="rules-note">
-        <div class="rules-icon">i</div>
-        <div><strong>전투 규칙 요약</strong><p>공격 피해 = 공격 주사위 합 × 공격자의 INT 배율(반올림). 대상은 방어 또는 회피를 시도할 수 있으며, 성공하면 피해를 무효화합니다. 승리 판정은 A/B 진영이 모두 지정된 경우 진영 기준, 그 외에는 생존자 1명 기준으로 처리됩니다.</p></div>
-      </section>
-    </main>
-
-    <aside class="log-sidebar">
-      <div class="log-header"><div><p class="eyebrow">COMBAT RECORD</p><h2>전투 로그</h2></div><span id="log-count" class="count-badge">0</span></div>
-      <div class="log-tools">
-        <button id="download-log" class="button button-secondary">TXT 추출</button>
-        <button id="copy-log" class="button button-quiet">로그 복사</button>
-        <button id="clear-log" class="button button-quiet">로그 비우기</button>
-      </div>
-      <div id="log-container" class="log-container" aria-live="polite"><div class="log-empty">전투 기록이 여기에 쌓입니다.</div></div>
-      <div class="log-footer"><span class="live-dot"></span> 브라우저에 자동 저장 중 <span id="save-indicator">저장됨</span></div>
-    </aside>
-  </div>
-
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <div id="modal-backdrop" class="modal-backdrop" hidden>
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <div class="modal-top"><p class="eyebrow">ACTION REQUIRED</p><button id="close-modal" class="icon-button" aria-label="닫기">×</button></div>
-      <h2 id="modal-title">방어 행동</h2><p id="modal-description"></p>
-      <div id="modal-actions" class="modal-actions"></div>
-    </section>
-  </div>
-  <script src="js/app.js"></script>
-</body>
-</html>
+<div class="app-shell">
+<aside class="sidebar">
+<header class="brand"><div class="brand-mark">BD</div><div><p class="eyebrow">TABLETOP COMBAT TOOL</p><h1>Battle Desk</h1></div></header>
+<section class="panel">
+<div class="section-heading"><span class="section-index">01</span><h2>캐릭터 편집 / 등록</h2></div>
+<form id="character-form">
+<label class="field-label" for="char-name">이름</label><input id="char-name" maxlength="50" placeholder="캐릭터 이름" autocomplete="off" required>
+<div class="field-grid">
+<label>진영 <span>TEAM</span><select id="char-team"><option value="A">A 진영</option><option value="B">B 진영</option><option value="N">중립</option></select></label>
+</div>
+<p class="small-note">아래 능력치 칸은 능력치 테이블의 사용자 지정 항목으로 자동 구성됩니다.</p>
+<div id="custom-stat-fields" class="field-grid"></div>
+<button class="button button-primary full-width" type="submit">＋ 전체 캐릭터에 저장</button>
+</form>
+</section>
+<section class="panel">
+<div class="section-heading"><span class="section-index">02</span><h2>전투 설정</h2></div>
+<label class="setting-row">선공 방식 <select id="initiative-mode"><option value="speed">민첩순 전투</option><option value="contest-each">매 턴 민첩 대항 판정</option></select></label>
+<label class="setting-row">도주 보정치 (%) <input id="escape-bonus" type="number" value="10"></label>
+<div class="button-stack">
+<button id="start-battle" class="button button-primary">전투 인원으로 전투 시작</button>
+<button id="next-turn" class="button button-secondary">차례 넘기기 <span>↗</span></button>
+<button id="undo" class="button button-quiet">↶ 마지막 행동 되돌리기</button>
+</div>
+<p class="helper-text">전투 인원 목록에 추가된 캐릭터만 전투에 참여합니다.</p>
+</section>
+<section class="panel">
+<div class="section-heading"><span class="section-index">03</span><h2>능력치 테이블</h2></div>
+<p class="helper-text">기본 5개 능력치로 시작하며 항목을 추가하거나 이름을 바꿀 수 있습니다. 주사위 식은 2d6+10 형식도 지원합니다.</p>
+<div class="table-scroll"><table class="stat-table"><thead id="mapping-head"></thead><tbody id="mapping-body"></tbody></table></div>
+<div class="inline-controls"><input id="new-stat-name" placeholder="새 능력치 이름"><select id="new-stat-type"><option value="dice">주사위 NdM</option><option value="number">숫자 / 배율</option></select><button id="add-stat" class="button button-secondary">능력치 추가</button></div>
+<button id="reset-config" class="button button-quiet full-width">기본 능력치로 초기화</button>
+</section>
+<section class="panel data-panel">
+<div class="section-heading"><span class="section-index">04</span><h2>데이터 관리</h2></div>
+<div class="button-grid"><button id="export-save" class="button button-secondary">백업 내보내기</button><button id="import-save" class="button button-secondary">백업 불러오기</button><button id="clear-battle" class="button button-quiet">전투 초기화</button><button id="clear-all" class="button button-danger-quiet">전체 초기화</button></div>
+<input id="import-file" type="file" accept="application/json,.json" hidden><p class="helper-text">캐릭터 목록과 설정을 JSON으로 백업할 수 있습니다.</p>
+</section><footer class="sidebar-footer">BATTLE DESK <span>·</span> GitHub Pages ready</footer>
+</aside>
+<main class="battle-main">
+<div class="topbar"><div><p class="eyebrow">ENCOUNTER CONTROL</p><h2>전장 현황</h2></div><div class="topbar-actions"><span id="battle-status" class="status-pill"><i></i> 대기 중</span></div></div>
+<section class="turn-banner"><div class="turn-symbol">✦</div><div><p class="eyebrow">CURRENT TURN</p><h3 id="turn-title">전투를 시작할 준비가 되었어요</h3><p id="turn-subtitle">전체 캐릭터를 만든 뒤 전투 인원으로 편성하세요.</p></div></section>
+<section class="panel"><div class="section-heading"><span class="section-index">A</span><h2>전체 캐릭터 목록 <span id="library-count" class="count-badge">0</span></h2></div>
+<p class="small-note">캐릭터를 미리 저장하고, 전투에 참가시킬 캐릭터만 선택해 추가하세요.</p><div class="library-list" id="library-list"></div>
+<div class="inline-controls" style="margin-top:10px"><select id="library-select"><option value="">전투에 추가할 캐릭터 선택</option></select><button id="add-to-roster" class="button button-primary">전투 인원에 추가 →</button></div></section>
+<div class="roster-toolbar"><div><h3>전투 인원 <span id="character-count" class="count-badge">0</span></h3><p>현재 전투에 참가하는 캐릭터입니다.</p></div><div class="filter-group"><button class="filter-button active" data-filter="all">전체</button><button class="filter-button" data-filter="A">A 진영</button><button class="filter-button" data-filter="B">B 진영</button><button class="filter-button" data-filter="N">중립</button></div></div>
+<div id="character-list" class="character-grid"><div class="empty-state"><div class="empty-icon">✦</div><h3>전투 인원이 없습니다</h3><p>전체 캐릭터 목록에서 참가자를 추가하세요.</p></div></div>
+<section class="rules-note"><div class="rules-icon">i</div><div><strong>전투 규칙 요약</strong><p>공격·치유·방어·반격은 능력치 테이블의 NdM 식을 사용합니다. 방어는 방어 굴림값만큼 피해를 경감하고, 반격은 상대 공격을 반격값만큼 줄인 뒤 같은 값의 피해를 되돌립니다.</p></div></section>
+</main>
+<aside class="log-sidebar"><div class="log-header"><div><p class="eyebrow">COMBAT RECORD</p><h2>전투 로그</h2></div><span id="log-count" class="count-badge">0</span></div><div class="log-tools"><button id="download-log" class="button button-secondary">TXT 추출</button><button id="copy-log" class="button button-quiet">로그 복사</button><button id="clear-log" class="button button-quiet">로그 비우기</button></div><div id="log-container" class="log-container" aria-live="polite"><div class="log-empty">전투 기록이 여기에 쌓입니다.</div></div><div class="log-footer"><span class="live-dot"></span> 브라우저에 자동 저장 중 <span id="save-indicator">저장됨</span></div></aside>
+</div><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="modal-backdrop" class="modal-backdrop" hidden><section class="modal" role="dialog" aria-modal="true"><div class="modal-top"><p class="eyebrow">ACTION REQUIRED</p><button id="close-modal" class="icon-button">×</button></div><h2 id="modal-title">반응 선택</h2><p id="modal-description"></p><div id="modal-actions" class="modal-actions"></div></section></div>
+<script src="js/app.js"></script></body></html>

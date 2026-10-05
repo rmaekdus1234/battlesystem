@@ -55,7 +55,7 @@
 <main class="battle-main">
 <div class="topbar"><div><p class="eyebrow">ENCOUNTER CONTROL</p><h2>전장 현황</h2></div><div class="topbar-actions"><span id="battle-status" class="status-pill"><i></i> 대기 중</span></div></div>
 <section class="turn-banner"><div class="turn-symbol">✦</div><div><p class="eyebrow">CURRENT TURN</p><h3 id="turn-title">전투를 시작할 준비가 되었어요</h3><p id="turn-subtitle">전체 캐릭터를 만든 뒤 전투 인원으로 편성하세요.</p></div></section>
-<section class="panel"><div class="section-heading"><span class="section-index">A</span><h2>전체 캐릭터 목록 <span id="library-count" class="count-badge">0</span></h2></div>
+<section id="library-section" class="panel"><div class="section-heading"><span class="section-index">A</span><h2>전체 캐릭터 목록 <span id="library-count" class="count-badge">0</span></h2></div>
 <div class="library-filter-toolbar" aria-label="전체 캐릭터 진영 필터"><span class="filter-label">진영 필터</span><div class="filter-group"><button type="button" class="filter-button active" data-library-filter="all">전체</button><button type="button" class="filter-button" data-library-filter="A">A 진영</button><button type="button" class="filter-button" data-library-filter="B">B 진영</button></div></div>
 <p class="small-note">캐릭터를 미리 저장하고, 전투에 참가시킬 캐릭터만 선택해 추가하세요.</p><div class="library-list" id="library-list"></div>
 <div class="inline-controls" style="margin-top:10px"><button id="add-to-roster" class="button button-primary">선택한 캐릭터를 전투 인원에 추가 →</button></div></section>
@@ -66,4 +66,4 @@
 <aside class="log-sidebar"><div class="log-header"><div><p class="eyebrow">COMBAT RECORD</p><h2>전투 로그</h2></div><span id="log-count" class="count-badge">0</span></div><div class="log-tools"><button id="download-log" class="button button-secondary">TXT 추출</button><button id="copy-log" class="button button-quiet">로그 복사</button><button id="clear-log" class="button button-quiet">로그 비우기</button></div><div id="log-container" class="log-container" aria-live="polite"><div class="log-empty">전투 기록이 여기에 쌓입니다.</div></div><div class="log-footer"><span class="live-dot"></span> 브라우저에 자동 저장 중 <span id="save-indicator">저장됨</span></div></aside>
 </div><div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="modal-backdrop" class="modal-backdrop" hidden><section class="modal" role="dialog" aria-modal="true"><div class="modal-top"><p class="eyebrow">ACTION REQUIRED</p><button id="close-modal" class="icon-button">×</button></div><h2 id="modal-title">반응 선택</h2><p id="modal-description"></p><div id="modal-actions" class="modal-actions"></div></section></div>
-<script src="js/app.js?v=9"></script></body></html>
+<script src="js/app.js?v=10"></script></body></html>

@@ -2,8 +2,8 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const clone=x=>JSON.parse(JSON.stringify(x));
-const KEY="battleDesk.custom.v8";
-const LEGACY_KEYS=["battleDesk.custom.v6","battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
+const KEY="battleDesk.custom.v10";
+const LEGACY_KEYS=["battleDesk.custom.v9","battleDesk.custom.v8","battleDesk.custom.v6","battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
 const DEFAULT_STATS=[
  {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180],evasion:[100,100,100,100,100],escape:[100,100,100,100,100]},
  {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
@@ -118,19 +118,25 @@ function renderLibrary(){
 function renderLogs(){$("log-count").textContent=logs.length;$("log-container").innerHTML=logs.length?logs.map(x=>`<div class="log-entry ${esc(x.type)}"><span class="log-time">${esc(x.time)}</span><span class="log-message">${esc(x.message)}</span></div>`).join(""):'<div class="log-empty">전투 기록이 여기에 쌓입니다.</div>';$(`log-container`).scrollTop=$(`log-container`).scrollHeight;}
 function render(){
  renderFactionControls();
+ const librarySection=$("library-section");
+ if(librarySection)librarySection.hidden=started;
  renderLibrary();$("character-count").textContent=roster.length;$("battle-status").innerHTML=`<i></i> ${started?"전투 진행 중":"대기 중"}`;$("battle-status").classList.toggle("active",started);const cur=get(roster,currentId);
  $("turn-title").textContent=started?(cur?`${cur.name}의 차례`:"전투 종료"):"전투를 시작할 준비가 되었어요";$("turn-subtitle").textContent=started?(pending?`${get(roster,pending.targetId)?.name||"대상"}의 반응을 기다리는 중`:"행동을 선택하거나 차례를 넘기세요."):"전체 캐릭터를 만든 뒤 전투 인원으로 편성하세요.";
  $("next-turn").disabled=!started||!!pending||!cur;$("undo").disabled=!history.length;
- const list=roster;
- $("character-list").innerHTML=list.length?list.map(c=>{
-  const current=started&&c.id===currentId&&!pending,target=pending?.targetId===c.id,inactive=!alive(c),pct=clamp(c.curHp/c.maxHp*100,0,100);let actions="";
-  if(current&&alive(c)){actions+=roster.filter(t=>t.id!==c.id&&alive(t)&&canTarget(c,t)).map(t=>`<button class="button button-attack" data-act="attack" data-id="${c.id}" data-target="${t.id}">공격 · ${esc(t.name)}</button>`).join("");actions+=roster.filter(t=>alive(t)&&canTarget(c,t)).map(t=>`<button class="button button-heal" data-act="heal" data-id="${c.id}" data-target="${t.id}">회복 · ${esc(t.name)}</button>`).join("");actions+=`<button class="button button-secondary" data-act="skip" data-id="${c.id}">차례 넘김</button><button class="button button-escape" data-act="escape" data-id="${c.id}">도주</button>`;}
-  const reactions=target?`<div class="reaction-box"><strong>⚑ 반응 선택</strong><p>${esc(get(roster,pending.attackerId)?.name||"상대")}의 공격입니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="defense" data-id="${c.id}">방어</button><button class="button button-secondary" data-act="react" data-reaction="counter" data-id="${c.id}">반격</button><button class="button button-secondary" data-act="react" data-reaction="evasion" data-id="${c.id}">회피</button><button class="button button-quiet" data-act="react" data-reaction="none" data-id="${c.id}">무대응</button></div></div>`:"";
-  return `<article class="character-card team-${c.team} ${current?"current-turn":""} ${target?"targeting":""} ${inactive?"inactive":""} ${c.dead?"dead":""}"><button class="card-delete" title="전투 인원에서 제외" data-act="remove-roster" data-id="${c.id}">×</button><button class="card-edit" title="캐릭터 스탯 수정" data-act="edit-roster" data-id="${c.id}">✎</button><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}${c.dead?'<span class="card-status">사망</span>':c.escaped?'<span class="card-status">도주</span>':""}</h4><p>${current?"현재 차례":inactive?"행동 불가":teamLabel(c.team)}</p><span class="team-tag">${teamLabel(c.team)}</span></div></div><div class="hp-meta"><span>체력</span><strong>${c.curHp} / ${c.maxHp}</strong></div><div class="hp-track"><div class="hp-fill ${pct<25?"low":""}" style="width:${pct}%"></div></div><div class="stat-chips">${stats.filter(s=>s.role!=="hp").map(s=>`<span class="stat-chip">${esc(s.name)} <b>${getCharacterStat(c,s)}</b></span>`).join("")}</div>${actions?`<div class="card-actions">${actions}</div>`:""}${reactions}</article>`;
- }).join(""):'<div class="empty-state"><div class="empty-icon">✦</div><h3>전투 인원이 없습니다</h3><p>전체 캐릭터 목록에서 참가자를 추가하세요.</p></div>';
+ const renderCard=c=>{
+  const current=started&&c.id===currentId&&!pending,target=pending?.targetId===c.id,protector=!!pending&&c.id!==pending.targetId&&c.team===get(roster,pending.targetId)?.team,inactive=!alive(c),pct=clamp(c.curHp/c.maxHp*100,0,100);let actions="";
+  if(current&&alive(c)){actions+=roster.filter(t=>t.id!==c.id&&alive(t)&&canAttackTarget(c,t)).map(t=>`<button class="button button-attack" data-act="attack" data-id="${c.id}" data-target="${t.id}">공격 · ${esc(t.name)}</button>`).join("");actions+=roster.filter(t=>alive(t)&&canHealTarget(c,t)).map(t=>`<button class="button button-heal" data-act="heal" data-id="${c.id}" data-target="${t.id}">회복 · ${esc(t.name)}</button>`).join("");actions+=`<button class="button button-secondary" data-act="skip" data-id="${c.id}">차례 넘김</button><button class="button button-escape" data-act="escape" data-id="${c.id}">도주</button>`;}
+  let reactions="";
+  if(target){reactions=`<div class="reaction-box"><strong>⚑ 반응 선택</strong><p>${esc(get(roster,pending.attackerId)?.name||"상대")}의 공격입니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="defense" data-id="${c.id}">방어</button><button class="button button-secondary" data-act="react" data-reaction="counter" data-id="${c.id}">반격</button><button class="button button-secondary" data-act="react" data-reaction="evasion" data-id="${c.id}">회피</button><button class="button button-quiet" data-act="react" data-reaction="none" data-id="${c.id}">무대응</button></div></div>`;}
+  else if(protector&&alive(c)){reactions=`<div class="reaction-box ally-reaction"><strong>🛡 대신 방어</strong><p>${esc(get(roster,pending.targetId)?.name||"아군")}을 대신해 공격을 받을 수 있습니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="guard" data-id="${c.id}">대신 방어</button></div></div>`;}
+  return `<article class="character-card team-${c.team} ${current?"current-turn":""} ${target?"targeting":""} ${protector?"guarding":""} ${inactive?"inactive":""} ${c.dead?"dead":""}"><button class="card-delete" title="전투 인원에서 제외" data-act="remove-roster" data-id="${c.id}">×</button><button class="card-edit" title="캐릭터 스탯 수정" data-act="edit-roster" data-id="${c.id}">✎</button><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}${c.dead?'<span class="card-status">사망</span>':c.escaped?'<span class="card-status">도주</span>':""}</h4><p>${current?"현재 차례":inactive?"행동 불가":teamLabel(c.team)}</p><span class="team-tag">${teamLabel(c.team)}</span></div></div><div class="hp-meta"><span>체력</span><strong>${c.curHp} / ${c.maxHp}</strong></div><div class="hp-track"><div class="hp-fill ${pct<25?"low":""}" style="width:${pct}%"></div></div><div class="stat-chips">${stats.filter(s=>s.role!=="hp").map(s=>`<span class="stat-chip">${esc(s.name)} <b>${getCharacterStat(c,s)}</b></span>`).join("")}</div>${actions?`<div class="card-actions">${actions}</div>`:""}${reactions}</article>`;
+ };
+ const groups=["A","B"].map(team=>{const list=roster.filter(c=>c.team===team);return `<section class="roster-faction team-${team}"><div class="roster-faction-header"><h3>${teamLabel(team)}</h3><span>${list.length}명</span></div><div class="character-grid">${list.length?list.map(renderCard).join(""):'<div class="empty-state compact-empty">이 진영의 전투 인원이 없습니다.</div>'}</div></section>`;}).join("");
+ $("character-list").innerHTML=groups;
  renderLogs();save();
 }
-function canTarget(a,b){const A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");return !(A&&B)||a.team!==b.team;}
+function canAttackTarget(a,b){const A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");return alive(a)&&alive(b)&&(!(A&&B)||a.team!==b.team);}
+function canHealTarget(a,b){return alive(a)&&alive(b)&&a.team===b.team;}
 function createCharacter(e){
  e.preventDefault();
  const name=$("char-name").value.trim();if(!name){toast("이름을 입력하세요.");return;}
@@ -186,18 +192,22 @@ function applyDamage(c,amount,label){const before=c.curHp;c.curHp=clamp(c.curHp-
 function evasionCheck(c){return resolveRuleRoll(c,"evasion");}
 function escapeCheck(c){return resolveRuleRoll(c,"escape");}
 function react(defenderId,reaction){
- if(!pending||pending.targetId!==defenderId)return;
- const a=get(roster,pending.attackerId),d=get(roster,defenderId);if(!a||!d)return;
+ if(!pending)return;
+ const a=get(roster,pending.attackerId),target=get(roster,pending.targetId),d=get(roster,defenderId);if(!a||!target||!d)return;
+ const isTarget=d.id===target.id, isAlly=d.team===target.team;
+ if(!isTarget && !(isAlly&&reaction==="guard"))return;
  const action=pending;pending=null;
  const atk=resolveStat(a,"attack");
  let attack=Math.max(0,atk.value);
- // 반격은 크리티컬을 적용하지 않습니다.
- if(reaction!=="counter"){
-  const crit=applyCritical(attack,a,"공격");
-  attack=crit.value;
- }
+ if(reaction!=="counter"){const crit=applyCritical(attack,a,"공격");attack=crit.value;}
  log(`${a.name} 공격 굴림: ${atk.desc}${reaction==="counter"?" · 반격이므로 크리티컬 제외":""}`);
- if(reaction==="defense"){
+ if(reaction==="guard"){
+  const basePct=clamp(Number(resolveStat(d,"defense").value)||0,0,100);
+  const crit=applyCritical(basePct,d,"방어");
+  const pct=clamp(crit.value,0,100),block=Math.round(attack*pct/100);
+  log(`${d.name}이(가) ${target.name}을 대신 방어: ${basePct}% → 적용 ${pct}% → ${block} 피해 경감`);
+  applyDamage(d,attack-block,"대신 방어 후");
+ }else if(reaction==="defense"){
   const basePct=clamp(Number(resolveStat(d,"defense").value)||0,0,100);
   const crit=applyCritical(basePct,d,"방어");
   const pct=clamp(crit.value,0,100),block=Math.round(attack*pct/100);

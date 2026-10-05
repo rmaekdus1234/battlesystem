@@ -17,7 +17,7 @@
 <form id="character-form">
 <label class="field-label" for="char-name">이름</label><input id="char-name" maxlength="50" placeholder="캐릭터 이름" autocomplete="off" required>
 <div class="field-grid">
-<label>진영 <span>TEAM</span><select id="char-team"><option value="A">A 진영</option><option value="B">B 진영</option><option value="N">중립</option></select></label>
+<label>진영 <span>TEAM</span><select id="char-team"><option value="A">A 진영</option><option value="B">B 진영</option></select></label>
 </div>
 <p class="small-note">각 능력치는 <b>스탯 번호</b>로 입력합니다. 실제 수치는 아래 스탯 테이블에서 지정합니다.</p>
 <div id="custom-stat-fields" class="field-grid"></div>
@@ -26,13 +26,21 @@
 </section>
 <section class="panel">
 <div class="section-heading"><span class="section-index">02</span><h2>전투 설정</h2></div>
+<div class="field-grid">
+<label>진영 A 이름 <span>FACTION A</span><input id="faction-a" class="wide-input" maxlength="30" value="A 진영"></label>
+<label>진영 B 이름 <span>FACTION B</span><input id="faction-b" class="wide-input" maxlength="30" value="B 진영"></label>
+</div>
 <label class="setting-row">선공 방식 <select id="initiative-mode"><option value="speed">민첩순 전투</option><option value="contest-each">매 턴 민첩 대항 판정</option></select></label>
 <div class="button-stack">
 <button id="start-battle" class="button button-primary">전투 인원으로 전투 시작</button>
 <button id="next-turn" class="button button-secondary">차례 넘기기 <span>↗</span></button>
 <button id="undo" class="button button-quiet">↶ 마지막 행동 되돌리기</button>
 </div>
-<p class="helper-text">전투 인원 목록에 추가된 캐릭터만 전투에 참여합니다.</p>
+<p class="helper-text">전투 인원 목록에 추가된 캐릭터만 전투에 참여합니다. 진영명은 저장되며 캐릭터 목록과 전투 화면에 함께 적용됩니다.</p>
+<div class="field-grid">
+<label>회피 판정 <span>AGI 사용</span><select id="evasion-rule"><option value="roll-equal">1dAGI = AGI</option><option value="d100-under">1d100 ≤ AGI</option></select></label>
+<label>도주 판정 <span>AGI 사용</span><select id="escape-rule"><option value="roll-equal">1dAGI = AGI</option><option value="d100-under">1d100 ≤ AGI</option></select></label>
+</div>
 </section>
 <section class="panel">
 <div class="section-heading"><span class="section-index">03</span><h2>능력치 테이블</h2></div>
@@ -51,9 +59,10 @@
 <div class="topbar"><div><p class="eyebrow">ENCOUNTER CONTROL</p><h2>전장 현황</h2></div><div class="topbar-actions"><span id="battle-status" class="status-pill"><i></i> 대기 중</span></div></div>
 <section class="turn-banner"><div class="turn-symbol">✦</div><div><p class="eyebrow">CURRENT TURN</p><h3 id="turn-title">전투를 시작할 준비가 되었어요</h3><p id="turn-subtitle">전체 캐릭터를 만든 뒤 전투 인원으로 편성하세요.</p></div></section>
 <section class="panel"><div class="section-heading"><span class="section-index">A</span><h2>전체 캐릭터 목록 <span id="library-count" class="count-badge">0</span></h2></div>
+<div class="filter-group library-filter"><button class="filter-button active" data-library-filter="all">전체</button><button class="filter-button" data-library-filter="A">A 진영</button><button class="filter-button" data-library-filter="B">B 진영</button></div>
 <p class="small-note">캐릭터를 미리 저장하고, 전투에 참가시킬 캐릭터만 선택해 추가하세요.</p><div class="library-list" id="library-list"></div>
 <div class="inline-controls" style="margin-top:10px"><select id="library-select"><option value="">전투에 추가할 캐릭터 선택</option></select><button id="add-to-roster" class="button button-primary">전투 인원에 추가 →</button></div></section>
-<div class="roster-toolbar"><div><h3>전투 인원 <span id="character-count" class="count-badge">0</span></h3><p>현재 전투에 참가하는 캐릭터입니다.</p></div><div class="filter-group"><button class="filter-button active" data-filter="all">전체</button><button class="filter-button" data-filter="A">A 진영</button><button class="filter-button" data-filter="B">B 진영</button><button class="filter-button" data-filter="N">중립</button></div></div>
+<div class="roster-toolbar"><div><h3>전투 인원 <span id="character-count" class="count-badge">0</span></h3><p>현재 전투에 참가하는 캐릭터입니다.</p></div><div class="filter-group"><button class="filter-button active" data-filter="all">전체</button><button class="filter-button" data-filter="A">A 진영</button><button class="filter-button" data-filter="B">B 진영</button></div></div>
 <div id="character-list" class="character-grid"><div class="empty-state"><div class="empty-icon">✦</div><h3>전투 인원이 없습니다</h3><p>전체 캐릭터 목록에서 참가자를 추가하세요.</p></div></div>
 <section class="rules-note"><div class="rules-icon">i</div><div><strong>전투 규칙 요약</strong><p>공격은 공격 등급의 주사위식을 사용합니다. 방어는 DEF 퍼센트만큼 피해를 경감하고, 반격은 같은 DEF 비율을 경감한 뒤 경감량을 되돌립니다. 민첩은 선공·회피에 사용하며, 행운(LUK)은 크리티컬 확률(%)에 사용합니다. 공격과 방어에만 크리티컬을 적용하며 반격에는 적용하지 않습니다. 1d100≤3은 대성공(2배), 1d100≤LUK은 크리티컬(1.5배), 1d100≥98은 대실패(0.5배)입니다.</p></div></section>
 </main>

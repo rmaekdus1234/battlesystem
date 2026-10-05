@@ -19,9 +19,9 @@
 <div class="field-grid">
 <label>진영 <span>TEAM</span><select id="char-team"><option value="A">A 진영</option><option value="B">B 진영</option><option value="N">중립</option></select></label>
 </div>
-<p class="small-note">아래 능력치 칸은 능력치 테이블의 사용자 지정 항목으로 자동 구성됩니다.</p>
+<p class="small-note">각 능력치는 1~8등급으로 선택합니다. 실제 수치는 아래 <b>상셋값 설정</b>에서 등급별로 지정합니다.</p>
 <div id="custom-stat-fields" class="field-grid"></div>
-<button class="button button-primary full-width" type="submit">＋ 전체 캐릭터에 저장</button>
+<button class="button button-primary full-width" type="submit">＋ 전체 캐릭터에 저장</button><button id="cancel-character-edit" class="button button-quiet full-width" type="button" hidden>수정 취소</button>
 </form>
 </section>
 <section class="panel">
@@ -37,10 +37,10 @@
 </section>
 <section class="panel">
 <div class="section-heading"><span class="section-index">03</span><h2>능력치 테이블</h2></div>
-<p class="helper-text">기본 5개 능력치로 시작하며 항목을 추가하거나 이름을 바꿀 수 있습니다. 주사위 식은 2d6+10 형식도 지원합니다.</p>
+<p class="helper-text">캐릭터는 각 능력치의 등급(Lv.1~8)을 선택합니다. 아래 표에서 등급별 실제 수치를 직접 수정할 수 있습니다.</p>
 <div class="table-scroll"><table class="stat-table"><thead id="mapping-head"></thead><tbody id="mapping-body"></tbody></table></div>
-<div class="inline-controls"><input id="new-stat-name" placeholder="새 능력치 이름"><select id="new-stat-type"><option value="dice">주사위 NdM</option><option value="number">숫자 / 배율</option></select><button id="add-stat" class="button button-secondary">능력치 추가</button></div>
-<button id="reset-config" class="button button-quiet full-width">기본 능력치로 초기화</button>
+<p class="small-note">현재 전투 기본 능력치는 체력(HP), 공격(ATK), 방어(DEF), 민첩(AGI), 행운(LUK) 5종입니다. 이 표의 값을 바꾸면 해당 등급의 캐릭터에게 즉시 반영됩니다.</p>
+<button id="reset-config" class="button button-quiet full-width">기본 상셋값으로 초기화</button>
 </section>
 <section class="panel data-panel">
 <div class="section-heading"><span class="section-index">04</span><h2>데이터 관리</h2></div>
@@ -56,7 +56,7 @@
 <div class="inline-controls" style="margin-top:10px"><select id="library-select"><option value="">전투에 추가할 캐릭터 선택</option></select><button id="add-to-roster" class="button button-primary">전투 인원에 추가 →</button></div></section>
 <div class="roster-toolbar"><div><h3>전투 인원 <span id="character-count" class="count-badge">0</span></h3><p>현재 전투에 참가하는 캐릭터입니다.</p></div><div class="filter-group"><button class="filter-button active" data-filter="all">전체</button><button class="filter-button" data-filter="A">A 진영</button><button class="filter-button" data-filter="B">B 진영</button><button class="filter-button" data-filter="N">중립</button></div></div>
 <div id="character-list" class="character-grid"><div class="empty-state"><div class="empty-icon">✦</div><h3>전투 인원이 없습니다</h3><p>전체 캐릭터 목록에서 참가자를 추가하세요.</p></div></div>
-<section class="rules-note"><div class="rules-icon">i</div><div><strong>전투 규칙 요약</strong><p>공격·치유·방어·반격은 능력치 테이블의 NdM 식을 사용합니다. 방어는 방어 굴림값만큼 피해를 경감하고, 반격은 상대 공격을 반격값만큼 줄인 뒤 같은 값의 피해를 되돌립니다.</p></div></section>
+<section class="rules-note"><div class="rules-icon">i</div><div><strong>전투 규칙 요약</strong><p>공격은 공격 등급의 주사위식을 사용합니다. 방어는 DEF 퍼센트만큼 피해를 경감하고, 반격은 같은 DEF 비율을 경감한 뒤 경감량을 되돌립니다. 민첩은 선공·회피에 사용하며, 행운(LUK)은 추후 행운 판정에 연결할 수 있습니다.</p></div></section>
 </main>
 <aside class="log-sidebar"><div class="log-header"><div><p class="eyebrow">COMBAT RECORD</p><h2>전투 로그</h2></div><span id="log-count" class="count-badge">0</span></div><div class="log-tools"><button id="download-log" class="button button-secondary">TXT 추출</button><button id="copy-log" class="button button-quiet">로그 복사</button><button id="clear-log" class="button button-quiet">로그 비우기</button></div><div id="log-container" class="log-container" aria-live="polite"><div class="log-empty">전투 기록이 여기에 쌓입니다.</div></div><div class="log-footer"><span class="live-dot"></span> 브라우저에 자동 저장 중 <span id="save-indicator">저장됨</span></div></aside>
 </div><div id="toast" class="toast" role="status" aria-live="polite"></div>

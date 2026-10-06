@@ -87,7 +87,7 @@ function syncHp(c,preserve=true){const s=stat(c,"hp");c.maxHp=Math.max(1,Number(
 function syncCharacter(c,preserveHp=true){c.levels=c.levels||{};c.values=c.values||{};stats.forEach(s=>{const lv=clamp(Number(c.levels[s.id])||1,1,s.defaults.length);c.levels[s.id]=lv;c.values[s.id]=getStatValue(s,lv);});syncHp(c,preserveHp);}
 function snap(){history.push(snapshot());if(history.length>50)history.shift();}
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("visible");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("visible"),2200);}
-function log(t,type="normal",actor=null){const name=actor||roster.find(c=>c?.name&&String(t).includes(c.name))?.name||"";logs.push({time:new Date().toLocaleTimeString("ko-KR"),message:t,type,actor:name});if(logs.length>1000)logs=logs.slice(-1000);renderLogs();}
+function log(t,type="normal",actor=null){const name=actor||"";logs.push({time:new Date().toLocaleTimeString("ko-KR"),message:String(t),type,actor:name});if(logs.length>1000)logs=logs.slice(-1000);renderLogs();}
 function roll(expr){const s=String(expr??"0").trim().toLowerCase().replace(/\s/g,"");const m=s.match(/^(\d+)d(\d+)([+-]\d+(?:\.\d+)?)?$/);if(m){const n=clamp(+m[1],1,100),sides=clamp(+m[2],1,10000),r=Array.from({length:n},()=>1+Math.floor(Math.random()*sides)),bonus=+(m[3]||0),sum=r.reduce((a,b)=>a+b,0)+bonus;return{value:sum,desc:`${expr} → [${r.join(", ")}]${bonus?` ${bonus>0?"+":""}${bonus}`:""} = ${sum}`};}const n=Number(s);return{value:Number.isFinite(n)?n:0,desc:`${expr} → ${Number.isFinite(n)?n:0}`};}
 
 function validHex(v){return /^#[0-9a-fA-F]{6}$/.test(String(v||""));}
@@ -172,11 +172,11 @@ function agilityLevel(c){const s=stat(c,"agility");return getCharacterStat(c,s);
 function agility(c){const s=stat(c,"agility");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?n:0;}
 // 민첩 대항: 양쪽이 자신의 AGI 범위에서 1회 굴림(1~AGI), 높은 값 승리. 동률은 재굴림.
 function agilityDice(c){const s=stat(c,"agility");const n=clamp(Number(c.values?.[s?.id])||1,1,100);return 1+Math.floor(Math.random()*n);}
-function rollRoundOrder(){const active=roster.filter(alive);if(!active.length)return [];if(mode==="agility-dice"){const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');rolls.forEach(x=>log(`${get(roster,x.id).name}: 1d민첩(${getCharacterStat(get(roster,x.id),stat(get(roster,x.id),"agility"))}) → ${x.roll}`));rolls.sort((a,b)=>b.roll-a.roll);let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}for(const g of groups)if(g.length>1){for(let i=1;i<g.length;i++){const a=get(roster,g[i-1].id),b=get(roster,g[i].id),w=contest(a,b);if(w===b.id){const tmp=g[i-1];g[i-1]=g[i];g[i]=tmp;}}}roundOrder=groups.flat().map(x=>x.id);log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}else{roundOrder=active.slice().sort((a,b)=>agility(b)-agility(a)).map(c=>c.id);log(`◆ ${round}라운드 민첩순 정렬`,'system');log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}return roundOrder;}
+function rollRoundOrder(){const active=roster.filter(alive);if(!active.length)return [];if(mode==="agility-dice"){const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');rolls.forEach(x=>{const c=get(roster,x.id);log(`1d민첩(${getCharacterStat(c,stat(c,"agility"))}) → ${x.roll}`,"normal",c.name);});rolls.sort((a,b)=>b.roll-a.roll);let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}for(const g of groups)if(g.length>1){for(let i=1;i<g.length;i++){const a=get(roster,g[i-1].id),b=get(roster,g[i].id),w=contest(a,b);if(w===b.id){const tmp=g[i-1];g[i-1]=g[i];g[i]=tmp;}}}roundOrder=groups.flat().map(x=>x.id);log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}else{roundOrder=active.slice().sort((a,b)=>agility(b)-agility(a)).map(c=>c.id);log(`◆ ${round}라운드 민첩순 정렬`,'system');log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}return roundOrder;}
 function contest(a,b){let guard=0;while(guard++<100){const ra=agilityDice(a),rb=agilityDice(b);log(`민첩 다이스 재판정: ${a.name} ${ra} vs ${b.name} ${rb}`);if(ra!==rb)return ra>rb?a.id:b.id;}return a.id;}
 function beginRound(){round++;roundOrder=rollRoundOrder();currentId=roundOrder.find(id=>alive(get(roster,id)))||null;log(`━━ ${round}라운드 시작 · ${get(roster,currentId)?.name||"없음"} 선공 ━━`,'system');}
 function startBattle(){if(!roster.length){toast("전투 인원을 먼저 편성하세요.");return;}snap();started=true;pending=null;round=0;roundOrder=[];mode=$("initiative-mode").value;beginRound();render();}
-function startAttack(aid,tid){const a=get(roster,aid),t=get(roster,tid);if(!started||!a||!t||aid!==currentId||!alive(a)||!alive(t))return;snap();pending={attackerId:aid,targetId:tid};log(`${a.name} → ${t.name} 공격 선언`);render();}
+function startAttack(aid,tid){const a=get(roster,aid),t=get(roster,tid);if(!started||!a||!t||aid!==currentId||!alive(a)||!alive(t))return;snap();pending={attackerId:aid,targetId:tid};log(`→ ${t.name} 공격 선언`,"normal",a.name);render();}
 function luck(c){const s=stat(c,"luck");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?Math.max(0,n):0;}
 function criticalRoll(c){
  const rollValue=1+Math.floor(Math.random()*100);
@@ -191,12 +191,31 @@ function criticalRoll(c){
 function applyCritical(value,c,kind){
  const cr=criticalRoll(c);
  const result=Math.round(value*cr.multiplier);
- log(`${c.name} ${kind} 판정: 1d100=${cr.roll} / LUK ${cr.chance}% / 극단적 성공 ${cr.extremeChance}% → ${cr.label} (${cr.multiplier}배)`,cr.resultType,c.name);
+ log(`${kind} 판정: 1d100=${cr.roll} / LUK ${cr.chance}% / 극단적 성공 ${cr.extremeChance}% → ${cr.label} (${cr.multiplier}배)`,cr.resultType,c.name);
  return {value:result,critical:cr};
 }
-function applyDamage(c,amount,label){const before=c.curHp;c.curHp=clamp(c.curHp-Math.max(0,Math.round(amount)),0,c.maxHp);log(`${c.name} ${label}: ${before-c.curHp} 피해 (HP ${before} → ${c.curHp})`,"damage");if(c.curHp<=0){c.dead=true;log(`${c.name} 전투 불능`,"important");}}
+function applyDamage(c,amount,label){const before=c.curHp;c.curHp=clamp(c.curHp-Math.max(0,Math.round(amount)),0,c.maxHp);log(`${label}: ${before-c.curHp} 피해 (HP ${before} → ${c.curHp})`,"damage");if(c.curHp<=0){c.dead=true;log(`전투 불능`,"important",c.name);}}
 function evasionCheck(c){return resolveRuleRoll(c,"evasion");}
 function escapeCheck(c){return resolveRuleRoll(c,"escape");}
+function resolveDefenseBlock(c,attack,critical=true){
+ const expr=String(getVal(c,"defense")??"0").trim();
+ const parsed=parseExpression(expr);
+ if(parsed.kind==="percent"){
+  const basePct=Math.max(0,parsed.value);
+  const cr=critical?applyCritical(basePct,c,"방어"):null;
+  const pct=clamp(cr?cr.value:basePct,0,100);
+  return {kind:"percent",input:parsed.raw,base:basePct,applied:pct,block:Math.round(attack*pct/100)};
+ }
+ const resolved=parsed.kind==="dice"?roll(parsed.raw):{value:parsed.value,desc:`${parsed.raw} → ${parsed.value}`};
+ const base= Math.max(0,Number(resolved.value)||0);
+ const cr=critical?applyCritical(base,c,"방어"):null;
+ const applied=Math.max(0,Math.round(cr?cr.value:base));
+ return {kind:"flat",input:parsed.raw,base,applied,block:applied,desc:resolved.desc};
+}
+function defenseLog(label,d,target,info){
+ if(info.kind==="percent") log(`${label}: ${info.input} → 적용 ${info.applied}% → ${info.block} 피해 경감`,"normal",d.name);
+ else log(`${label}: ${info.input} → 적용 ${info.applied} → ${info.block} 피해 경감`,"normal",d.name);
+}
 function react(defenderId,reaction){
  if(!pending)return;
  const a=get(roster,pending.attackerId),target=get(roster,pending.targetId),d=get(roster,defenderId);if(!a||!target||!d)return;
@@ -206,33 +225,29 @@ function react(defenderId,reaction){
  const atk=resolveStat(a,"attack");
  let attack=Math.max(0,atk.value);
  if(reaction!=="counter"){const crit=applyCritical(attack,a,"공격");attack=crit.value;}
- log(`${a.name} 공격 굴림: ${atk.desc}${reaction==="counter"?" · 반격이므로 크리티컬 제외":""}`);
+ log(`공격 굴림: ${atk.desc}${reaction==="counter"?" · 반격이므로 크리티컬 제외":""}`,"normal",a.name);
  if(reaction==="guard"){
-  const basePct=clamp(Number(resolveStat(d,"defense").value)||0,0,100);
-  const crit=applyCritical(basePct,d,"방어");
-  const pct=clamp(crit.value,0,100),block=Math.round(attack*pct/100);
-  log(`${d.name}이(가) ${target.name}을 대신 방어: ${basePct}% → 적용 ${pct}% → ${block} 피해 경감`);
-  applyDamage(d,attack-block,"대신 방어 후");
+  const info=resolveDefenseBlock(d,attack,true);
+  defenseLog(`대신 방어 (${target.name})`,d,target,info);
+  applyDamage(d,attack-info.block,"대신 방어 후");
  }else if(reaction==="defense"){
-  const basePct=clamp(Number(resolveStat(d,"defense").value)||0,0,100);
-  const crit=applyCritical(basePct,d,"방어");
-  const pct=clamp(crit.value,0,100),block=Math.round(attack*pct/100);
-  log(`${d.name} 방어: ${basePct}% → 적용 ${pct}% → ${block} 피해 경감`);
-  applyDamage(d,attack-block,"방어 후");
+  const info=resolveDefenseBlock(d,attack,true);
+  defenseLog(`방어`,d,target,info);
+  applyDamage(d,attack-info.block,"방어 후");
  }else if(reaction==="counter"){
-  const pct=clamp(Number(resolveStat(d,"defense").value)||0,0,100),counter=Math.round(attack*pct/100);
-  log(`${d.name} 반격: 방어 ${pct}% → ${counter} 피해 경감 및 반사 피해 ${counter}`);
+  const info=resolveDefenseBlock(d,attack,false),counter=Math.min(attack,info.block);
+  defenseLog(`반격`,d,target,{...info,block:counter,applied:info.kind==="percent"?info.applied:counter});
   applyDamage(d,attack-counter,"반격 후");if(alive(a))applyDamage(a,counter,"반격 피해");
  }else if(reaction==="evasion"){
-  const r=evasionCheck(d);log(`${d.name} 회피 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success)log(`${d.name} 회피 성공`,"important");else applyDamage(d,attack,"회피 실패 후");
+  const r=evasionCheck(d);log(`회피 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`,"normal",d.name);if(r.success)log(`회피 성공`,"important",d.name);else applyDamage(d,attack,"회피 실패 후");
  }else applyDamage(d,attack,"피해");
  const winner=checkVictory();if(winner){started=false;currentId=null;render();return;}advanceTurn(action.attackerId);
 }
-function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const before=t.curHp;const amount=Math.max(0,Math.round(r.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`${c.name} → ${t.name} 치유: ${r.desc} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal");advanceTurn(cid);}
-function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;snap();const text=prompt(`${c.name}의 스킬 사용 내용을 GM 로그에 기록합니다.\n(스킬 효과 자체는 프로그램에서 처리하지 않습니다.)`);if(text===null)return;log(`${c.name} [스킬] ${text||"스킬 사용"}`,'important');advanceTurn(cid);}
-function gmHpAdjust(cid,sign){const c=get(roster,cid);if(!c)return;const raw=prompt(`${c.name} HP를 ${sign>0?"얼마나 회복":"얼마나 차감"}할까요?`,"10");if(raw===null)return;const amount=Math.max(0,Number(raw)||0);if(!amount){toast("0보다 큰 숫자를 입력하세요.");return;}snap();const before=c.curHp;c.curHp=clamp(c.curHp+sign*amount,0,c.maxHp);if(c.curHp>0)c.dead=false;else c.dead=true;log(`GM HP 조정 · ${c.name}: ${before} → ${c.curHp} (${sign>0?"회복":"차감"} ${amount})`,'system');render();}
-function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`${c.name} 도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success){c.escaped=true;log(`${c.name} 도주 성공`,"important");}else log(`${c.name} 도주 실패`);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
-function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}const idx=roundOrder.indexOf(from);let next=null;for(let i=idx+1;i<roundOrder.length;i++){const c=get(roster,roundOrder[i]);if(alive(c)){next=c;break;}}if(next){currentId=next.id;}else{beginRound();}log(`▶ 다음 차례: ${get(roster,currentId)?.name||"없음"}`);render();}
+function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const before=t.curHp;const amount=Math.max(0,Math.round(r.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`→ ${t.name} 치유: ${r.desc} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal",c.name);advanceTurn(cid);}
+function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;snap();const text=prompt(`${c.name}의 스킬 사용 내용을 GM 로그에 기록합니다.\n(스킬 효과 자체는 프로그램에서 처리하지 않습니다.)`);if(text===null)return;log(`[스킬] ${text||"스킬 사용"}`,'important',c.name);advanceTurn(cid);}
+function gmHpAdjust(cid,sign){const c=get(roster,cid);if(!c)return;const raw=prompt(`${c.name} HP를 ${sign>0?"얼마나 회복":"얼마나 차감"}할까요?`,"10");if(raw===null)return;const amount=Math.max(0,Number(raw)||0);if(!amount){toast("0보다 큰 숫자를 입력하세요.");return;}snap();const before=c.curHp;c.curHp=clamp(c.curHp+sign*amount,0,c.maxHp);if(c.curHp>0)c.dead=false;else c.dead=true;log(`GM HP 조정: ${before} → ${c.curHp} (${sign>0?"회복":"차감"} ${amount})`,'system',c.name);render();}
+function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`,"normal",c.name);if(r.success){c.escaped=true;log(`도주 성공`,"important",c.name);}else log(`도주 실패`,"normal",c.name);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
+function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}const idx=roundOrder.indexOf(from);let next=null;for(let i=idx+1;i<roundOrder.length;i++){const c=get(roster,roundOrder[i]);if(alive(c)){next=c;break;}}if(next){currentId=next.id;}else{beginRound();}log(`▶ 다음 차례`,"normal",get(roster,currentId)?.name||"");render();}
 function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(roster.length>1&&active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");return w;}return null;}
 function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,round,roundOrder}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
 function exportSave(){const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="battle-desk-backup.json";a.click();URL.revokeObjectURL(a.href);}

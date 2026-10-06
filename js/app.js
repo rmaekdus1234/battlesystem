@@ -9,10 +9,10 @@ const DEFAULT_STATS=[
  {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
  {id:"def",name:"방어(DEF)",type:"number",role:"defense",defaults:[10,20,30,40,50],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
  {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45],evasion:[5,15,25,35,45],escape:[5,15,25,35,45]},
- {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
- {id:"heal",name:"치유(HEAL)",type:"number",role:"heal",defaults:["10","1d6+2","2d6","2d8+2","3d8"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]}
+ {id:"heal",name:"치유(HEAL)",type:"number",role:"heal",defaults:["10","1d6+2","2d6","2d8+2","3d8"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
+ {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]}
 ];
-let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, round=0, roundOrder=[], toastTimer;
+let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#b9f36a",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -21,7 +21,7 @@ const alive=c=>!!c&&!c.dead&&!c.escaped;
 const stat=(c,role)=>stats.find(s=>s.role===role);
 const rowCount=()=>Math.max(1,...stats.map(s=>s.defaults.length));
 
-function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,round,roundOrder});}
+function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,theme,round,roundOrder});}
 function save(){
  try{
   const payload=JSON.stringify(snapshot());
@@ -40,7 +40,7 @@ function load(){
   if(!raw){stats=clone(DEFAULT_STATS);return;}
   const d=JSON.parse(raw);
   stats=normalizeStats(d.stats||clone(DEFAULT_STATS)); library=Array.isArray(d.library)?d.library:[]; roster=Array.isArray(d.roster)?d.roster:[];
-  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
+  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#b9f36a",background:validHex(d.theme?.background)?d.theme.background:"#11131a"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
   migrateCharacters();
  }catch(e){console.warn("저장 데이터 불러오기 실패",e);}
 }
@@ -87,10 +87,12 @@ function syncHp(c,preserve=true){const s=stat(c,"hp");c.maxHp=Math.max(1,Number(
 function syncCharacter(c,preserveHp=true){c.levels=c.levels||{};c.values=c.values||{};stats.forEach(s=>{const lv=clamp(Number(c.levels[s.id])||1,1,s.defaults.length);c.levels[s.id]=lv;c.values[s.id]=getStatValue(s,lv);});syncHp(c,preserveHp);}
 function snap(){history.push(snapshot());if(history.length>50)history.shift();}
 function toast(t){const el=$("toast");el.textContent=t;el.classList.add("visible");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("visible"),2200);}
-function log(t,type="normal"){logs.push({time:new Date().toLocaleTimeString("ko-KR"),message:t,type});if(logs.length>1000)logs=logs.slice(-1000);renderLogs();}
+function log(t,type="normal",actor=null){const name=actor||roster.find(c=>c?.name&&String(t).includes(c.name))?.name||"";logs.push({time:new Date().toLocaleTimeString("ko-KR"),message:t,type,actor:name});if(logs.length>1000)logs=logs.slice(-1000);renderLogs();}
 function roll(expr){const s=String(expr??"0").trim().toLowerCase().replace(/\s/g,"");const m=s.match(/^(\d+)d(\d+)([+-]\d+(?:\.\d+)?)?$/);if(m){const n=clamp(+m[1],1,100),sides=clamp(+m[2],1,10000),r=Array.from({length:n},()=>1+Math.floor(Math.random()*sides)),bonus=+(m[3]||0),sum=r.reduce((a,b)=>a+b,0)+bonus;return{value:sum,desc:`${expr} → [${r.join(", ")}]${bonus?` ${bonus>0?"+":""}${bonus}`:""} = ${sum}`};}const n=Number(s);return{value:Number.isFinite(n)?n:0,desc:`${expr} → ${Number.isFinite(n)?n:0}`};}
 
 function validHex(v){return /^#[0-9a-fA-F]{6}$/.test(String(v||""));}
+function applyTheme(){document.documentElement.style.setProperty("--accent",theme.accent);document.documentElement.style.setProperty("--bg",theme.background);const meta=document.querySelector("meta[name=theme-color]");if(meta)meta.content=theme.background;}
+function renderThemeControls(){["accent","background"].forEach(k=>{const c=$("theme-"+k+"-color"),h=$("theme-"+k+"-hex");if(c)c.value=theme[k];if(h)h.value=theme[k];});applyTheme();}
 function factionName(team){return factionNames[team]||team;}
 function teamLabel(team){return esc(factionName(team));}
 function renderFactionControls(){
@@ -116,7 +118,7 @@ function renderLibrary(){
  $("library-list").innerHTML=filteredLibrary.length?filteredLibrary.map(c=>{const inRoster=roster.some(r=>r.libraryId===c.id);return `<article class="library-card team-${c.team}"><label class="library-check"><input type="checkbox" data-library-check="${c.id}" ${inRoster?"disabled":""}><span></span></label><div class="library-card-main"><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}</h4><p>${teamLabel(c.team)}${inRoster?" · 전투 참가 중":""}</p></div></div><div class="library-stat-grid">${stats.map(s=>`<div class="library-stat"><small>${esc(s.name)}</small><b>${esc(getCharacterStat(c,s))}</b></div>`).join("")}</div></div><div class="library-card-actions"><button class="button button-secondary" data-lib-edit="${c.id}">수정</button><button class="button button-quiet" data-lib-delete="${c.id}">삭제</button></div></article>`;}).join(""):'<div class="empty-state"><h3>저장된 캐릭터가 없습니다</h3><p>위에서 캐릭터를 등록하세요.</p></div>';
 }
 
-function renderLogs(){$("log-count").textContent=logs.length;$("log-container").innerHTML=logs.length?logs.map(x=>`<div class="log-entry ${esc(x.type)}"><span class="log-time">${esc(x.time)}</span><span class="log-message">${esc(x.message)}</span></div>`).join(""):'<div class="log-empty">전투 기록이 여기에 쌓입니다.</div>';$(`log-container`).scrollTop=$(`log-container`).scrollHeight;}
+function renderLogs(){$("log-count").textContent=logs.length;$(`log-container`).innerHTML=logs.length?logs.map(x=>`<div class="log-entry ${esc(x.type)}"><div class="log-meta"><strong class="log-name">${esc(x.actor||"")}</strong><span class="log-time">${esc(x.time)}</span></div><div class="log-message">${esc(x.message)}</div></div>`).join(""):'<div class="log-empty">전투 기록이 여기에 쌓입니다.</div>';$(`log-container`).scrollTop=$(`log-container`).scrollHeight;}
 function render(){
  renderFactionControls();
  const librarySection=$("library-section");
@@ -170,7 +172,7 @@ function agilityLevel(c){const s=stat(c,"agility");return getCharacterStat(c,s);
 function agility(c){const s=stat(c,"agility");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?n:0;}
 // 민첩 대항: 양쪽이 자신의 AGI 범위에서 1회 굴림(1~AGI), 높은 값 승리. 동률은 재굴림.
 function agilityDice(c){const s=stat(c,"agility");const n=clamp(Number(c.values?.[s?.id])||1,1,100);return 1+Math.floor(Math.random()*n);}
-function rollRoundOrder(){const active=roster.filter(alive);if(!active.length)return [];if(mode==="agility-dice"){const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');rolls.forEach(x=>log(`${get(roster,x.id).name}: 1d민첩(${getCharacterStat(get(roster,x.id),stat(get(roster,x.id),"agility"))}) → ${x.roll}`));rolls.sort((a,b)=>b.roll-a.roll);let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}for(const g of groups)if(g.length>1){for(let i=1;i<g.length;i++){const a=get(roster,g[i-1].id),b=get(roster,g[i].id),w=contest(a,b);if(w===b.id){const tmp=g[i-1];g[i-1]=g[i];g[i]=tmp;}}}roundOrder=groups.flat().map(x=>x.id);}else{roundOrder=active.slice().sort((a,b)=>agility(b)-agility(a)).map(c=>c.id);log(`◆ ${round}라운드 민첩순 정렬: ${roundOrder.map(x=>get(roster,x)?.name).join(" → ")}`,'system');}return roundOrder;}
+function rollRoundOrder(){const active=roster.filter(alive);if(!active.length)return [];if(mode==="agility-dice"){const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');rolls.forEach(x=>log(`${get(roster,x.id).name}: 1d민첩(${getCharacterStat(get(roster,x.id),stat(get(roster,x.id),"agility"))}) → ${x.roll}`));rolls.sort((a,b)=>b.roll-a.roll);let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}for(const g of groups)if(g.length>1){for(let i=1;i<g.length;i++){const a=get(roster,g[i-1].id),b=get(roster,g[i].id),w=contest(a,b);if(w===b.id){const tmp=g[i-1];g[i-1]=g[i];g[i]=tmp;}}}roundOrder=groups.flat().map(x=>x.id);log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}else{roundOrder=active.slice().sort((a,b)=>agility(b)-agility(a)).map(c=>c.id);log(`◆ ${round}라운드 민첩순 정렬`,'system');log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}return roundOrder;}
 function contest(a,b){let guard=0;while(guard++<100){const ra=agilityDice(a),rb=agilityDice(b);log(`민첩 다이스 재판정: ${a.name} ${ra} vs ${b.name} ${rb}`);if(ra!==rb)return ra>rb?a.id:b.id;}return a.id;}
 function beginRound(){round++;roundOrder=rollRoundOrder();currentId=roundOrder.find(id=>alive(get(roster,id)))||null;log(`━━ ${round}라운드 시작 · ${get(roster,currentId)?.name||"없음"} 선공 ━━`,'system');}
 function startBattle(){if(!roster.length){toast("전투 인원을 먼저 편성하세요.");return;}snap();started=true;pending=null;round=0;roundOrder=[];mode=$("initiative-mode").value;beginRound();render();}
@@ -179,15 +181,17 @@ function luck(c){const s=stat(c,"luck");const n=Number(c.values?.[s?.id]);return
 function criticalRoll(c){
  const rollValue=1+Math.floor(Math.random()*100);
  const chance=luck(c);
- if(rollValue<=3)return {roll:rollValue,chance,multiplier:2,label:"대성공"};
- if(rollValue>=98)return {roll:rollValue,chance,multiplier:0.5,label:"대실패"};
- if(rollValue<=chance)return {roll:rollValue,chance,multiplier:1.5,label:"크리티컬"};
- return {roll:rollValue,chance,multiplier:1,label:"일반"};
+ const extremeChance=chance/2;
+ if(rollValue<=3)return {roll:rollValue,chance,extremeChance,multiplier:2,label:"대성공",resultType:"great-success"};
+ if(rollValue<=extremeChance)return {roll:rollValue,chance,extremeChance,multiplier:1.75,label:"극단적 성공",resultType:"extreme-success"};
+ if(rollValue<=chance)return {roll:rollValue,chance,extremeChance,multiplier:1.5,label:"성공",resultType:"success"};
+ if(rollValue>=98)return {roll:rollValue,chance,extremeChance,multiplier:0.5,label:"대실패",resultType:"great-failure"};
+ return {roll:rollValue,chance,extremeChance,multiplier:1,label:"실패",resultType:"failure"};
 }
 function applyCritical(value,c,kind){
  const cr=criticalRoll(c);
  const result=Math.round(value*cr.multiplier);
- log(`${c.name} ${kind} 크리티컬 판정: 1d100=${cr.roll} / 확률 ${cr.chance}% → ${cr.label} (${cr.multiplier}배)`,cr.multiplier===1?"normal":cr.multiplier>1?"important":"damage");
+ log(`${c.name} ${kind} 판정: 1d100=${cr.roll} / LUK ${cr.chance}% / 극단적 성공 ${cr.extremeChance}% → ${cr.label} (${cr.multiplier}배)`,cr.resultType,c.name);
  return {value:result,critical:cr};
 }
 function applyDamage(c,amount,label){const before=c.curHp;c.curHp=clamp(c.curHp-Math.max(0,Math.round(amount)),0,c.maxHp);log(`${c.name} ${label}: ${before-c.curHp} 피해 (HP ${before} → ${c.curHp})`,"damage");if(c.curHp<=0){c.dead=true;log(`${c.name} 전투 불능`,"important");}}
@@ -227,12 +231,12 @@ function react(defenderId,reaction){
 function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const before=t.curHp;const amount=Math.max(0,Math.round(r.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`${c.name} → ${t.name} 치유: ${r.desc} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal");advanceTurn(cid);}
 function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;snap();const text=prompt(`${c.name}의 스킬 사용 내용을 GM 로그에 기록합니다.\n(스킬 효과 자체는 프로그램에서 처리하지 않습니다.)`);if(text===null)return;log(`${c.name} [스킬] ${text||"스킬 사용"}`,'important');advanceTurn(cid);}
 function gmHpAdjust(cid,sign){const c=get(roster,cid);if(!c)return;const raw=prompt(`${c.name} HP를 ${sign>0?"얼마나 회복":"얼마나 차감"}할까요?`,"10");if(raw===null)return;const amount=Math.max(0,Number(raw)||0);if(!amount){toast("0보다 큰 숫자를 입력하세요.");return;}snap();const before=c.curHp;c.curHp=clamp(c.curHp+sign*amount,0,c.maxHp);if(c.curHp>0)c.dead=false;else c.dead=true;log(`GM HP 조정 · ${c.name}: ${before} → ${c.curHp} (${sign>0?"회복":"차감"} ${amount})`,'system');render();}
-function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`${c.name} 도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success){c.escaped=true;log(`${c.name} 도주 성공`,"important");}else log(`${c.name} 도주 실패`);log(`▶ 도주 판정으로 ${c.name}의 차례 소모`);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
+function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`${c.name} 도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`);if(r.success){c.escaped=true;log(`${c.name} 도주 성공`,"important");}else log(`${c.name} 도주 실패`);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
 function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}const idx=roundOrder.indexOf(from);let next=null;for(let i=idx+1;i<roundOrder.length;i++){const c=get(roster,roundOrder[i]);if(alive(c)){next=c;break;}}if(next){currentId=next.id;}else{beginRound();}log(`▶ 다음 차례: ${get(roster,currentId)?.name||"없음"}`);render();}
 function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(roster.length>1&&active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");return w;}return null;}
 function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,round,roundOrder}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
 function exportSave(){const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="battle-desk-backup.json";a.click();URL.revokeObjectURL(a.href);}
-function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};migrateCharacters();renderStats();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
+function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"};theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#b9f36a",background:validHex(d.theme?.background)?d.theme.background:"#11131a"};round=Number(d.round)||0;roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[];migrateCharacters();renderStats();renderThemeControls();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
 function addStatRow(){snap();stats.forEach(s=>{s.defaults.push(s.defaults[s.defaults.length-1]??"");s.evasion=s.evasion||[];s.escape=s.escape||[];s.evasion.push(s.evasion[s.evasion.length-1]??0);s.escape.push(s.escape[s.escape.length-1]??0);});renderStats();render();toast(`${rowCount()}번째 스탯 단계를 추가했습니다.`);}
 function removeStatRow(){const n=rowCount();if(n<=1){toast("최소 1줄은 유지해야 합니다.");return;}snap();stats.forEach(s=>{s.defaults.pop();if(s.evasion?.length)s.evasion.pop();if(s.escape?.length)s.escape.pop();});library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();toast("마지막 스탯 단계를 삭제했습니다.");}
 function addStatColumn(){toast("능력치 열 추가는 현재 기본 전투 능력치 5종을 기준으로 합니다.");}
@@ -275,10 +279,19 @@ on("import-save","click",()=>{const el=$("import-file");if(el)el.click();});
 on("import-file","change",e=>{if(e.target.files[0])importSave(e.target.files[0]);e.target.value="";});
 on("clear-battle","click",clearBattle);
 on("clear-all","click",clearAll);
-on("download-log","click",()=>{const a=document.createElement("a"),blob=new Blob([logs.map(x=>`[${x.time}] ${x.message}`).join("\n")],{type:"text/plain;charset=utf-8"});a.href=URL.createObjectURL(blob);a.download="battle-log.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0);});
-on("copy-log","click",async()=>{try{const text=logs.map(x=>`[${x.time}] ${x.message}`).join("\n");if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}toast("로그 복사 완료");}catch(e){toast("복사할 수 없습니다");}});
+on("download-log","click",()=>{const a=document.createElement("a"),blob=new Blob([logs.map(x=>`[${x.actor?x.actor+" | ":""}${x.time}] ${x.message}`).join("\n")],{type:"text/plain;charset=utf-8"});a.href=URL.createObjectURL(blob);a.download="battle-log.txt";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),0);});
+on("copy-log","click",async()=>{try{const text=logs.map(x=>`[${x.actor?x.actor+" | ":""}${x.time}] ${x.message}`).join("\n");if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}toast("로그 복사 완료");}catch(e){toast("복사할 수 없습니다");}});
 on("clear-log","click",()=>{if(confirm("로그를 비울까요?")){logs=[];renderLogs();save();}});
 on("close-modal","click",()=>{$("modal-backdrop").hidden=true;});
+on("theme-settings","click",()=>{$("theme-backdrop").hidden=false;renderThemeControls();});
+on("close-theme","click",()=>{$("theme-backdrop").hidden=true;});
+on("theme-backdrop","click",e=>{if(e.target===$("theme-backdrop"))$("theme-backdrop").hidden=true;});
+document.querySelectorAll("[data-theme-accent]").forEach(b=>b.addEventListener("click",()=>{theme.accent=b.dataset.themeAccent;renderThemeControls();save();}));
+
+on("theme-accent-color","input",e=>{theme.accent=e.target.value;renderThemeControls();save();});
+on("theme-background-color","input",e=>{theme.background=e.target.value;renderThemeControls();save();});
+on("theme-accent-hex","change",e=>{const v=e.target.value.trim();if(!validHex(v)){toast("테마 색상 HEX는 #RRGGBB 형식이어야 합니다.");renderThemeControls();return;}theme.accent=v.toLowerCase();renderThemeControls();save();});
+on("theme-background-hex","change",e=>{const v=e.target.value.trim();if(!validHex(v)){toast("배경 색상 HEX는 #RRGGBB 형식이어야 합니다.");renderThemeControls();return;}theme.background=v.toLowerCase();renderThemeControls();save();});
 
 load();
 if(mode==="contest-each")mode="agility-dice"; const initMode=$("initiative-mode");if(initMode)initMode.value=mode;

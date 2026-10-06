@@ -91,7 +91,18 @@ function log(t,type="normal",actor=null){const name=actor||"";logs.push({time:ne
 function roll(expr){const s=String(expr??"0").trim().toLowerCase().replace(/\s/g,"");const m=s.match(/^(\d+)d(\d+)([+-]\d+(?:\.\d+)?)?$/);if(m){const n=clamp(+m[1],1,100),sides=clamp(+m[2],1,10000),r=Array.from({length:n},()=>1+Math.floor(Math.random()*sides)),bonus=+(m[3]||0),sum=r.reduce((a,b)=>a+b,0)+bonus;return{value:sum,desc:`${expr} → [${r.join(", ")}]${bonus?` ${bonus>0?"+":""}${bonus}`:""} = ${sum}`};}const n=Number(s);return{value:Number.isFinite(n)?n:0,desc:`${expr} → ${Number.isFinite(n)?n:0}`};}
 
 function validHex(v){return /^#[0-9a-fA-F]{6}$/.test(String(v||""));}
-function applyTheme(){document.documentElement.style.setProperty("--accent",theme.accent);document.documentElement.style.setProperty("--bg",theme.background);const meta=document.querySelector("meta[name=theme-color]");if(meta)meta.content=theme.background;}
+function hexRgb(hex){const h=String(hex||"").replace("#","");return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16)};}
+function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>Math.round(clamp(v,0,255)).toString(16).padStart(2,"0")).join("");}
+function mixHex(a,b,t){const x=hexRgb(a),y=hexRgb(b);return rgbHex(x.r+(y.r-x.r)*t,x.g+(y.g-x.g)*t,x.b+(y.b-x.b)*t);}
+function applyTheme(){
+ const bg=theme.background, rgb=hexRgb(bg), luminance=(0.2126*rgb.r+0.7152*rgb.g+0.0722*rgb.b)/255, light=luminance>=0.58;
+ const panel=light?mixHex(bg,"#000000",.045):mixHex(bg,"#ffffff",.075), panel2=light?mixHex(bg,"#000000",.085):mixHex(bg,"#ffffff",.12);
+ const line=light?mixHex(bg,"#000000",.16):mixHex(bg,"#ffffff",.16), text=light?"#20242c":"#f2f4fb", muted=light?"#606774":"#9299ad", field=light?mixHex(bg,"#000000",.075):mixHex(bg,"#000000",.32), logBg=light?mixHex(bg,"#000000",.065):mixHex(bg,"#000000",.48), button=light?mixHex(bg,"#000000",.08):mixHex(bg,"#ffffff",.09), table=light?mixHex(bg,"#000000",.11):mixHex(bg,"#000000",.18);
+ const root=document.documentElement;
+ [["--accent",theme.accent],["--bg",bg],["--panel",panel],["--panel2",panel2],["--panel-soft",panel2],["--line",line],["--text",text],["--muted",muted],["--field",field],["--log-bg",logBg],["--button-bg",button],["--table-bg",table],["--accent-ink",light?"#ffffff":"#18200e"],["--theme-shadow",light?"#00000022":"#00000088"]].forEach(([k,v])=>root.style.setProperty(k,v));
+ root.style.setProperty("--theme-light",light?"1":"0"); root.style.colorScheme=light?"light":"dark";
+ const meta=document.querySelector("meta[name=theme-color]");if(meta)meta.content=theme.background;
+}
 function renderThemeControls(){["accent","background"].forEach(k=>{const c=$("theme-"+k+"-color"),h=$("theme-"+k+"-hex");if(c)c.value=theme[k];if(h)h.value=theme[k];});applyTheme();}
 function factionName(team){return factionNames[team]||team;}
 function teamLabel(team){return esc(factionName(team));}
@@ -244,7 +255,14 @@ function react(defenderId,reaction){
  const winner=checkVictory();if(winner){started=false;currentId=null;render();return;}advanceTurn(action.attackerId);
 }
 function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const before=t.curHp;const amount=Math.max(0,Math.round(r.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`→ ${t.name} 치유: ${r.desc} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal",c.name);advanceTurn(cid);}
-function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;snap();const text=prompt(`${c.name}의 스킬 사용 내용을 GM 로그에 기록합니다.\n(스킬 효과 자체는 프로그램에서 처리하지 않습니다.)`);if(text===null)return;log(`[스킬] ${text||"스킬 사용"}`,'important',c.name);advanceTurn(cid);}
+function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;
+ $("modal-title").textContent="스킬 사용";
+ $("modal-description").textContent=`${c.name}이(가) 스킬을 사용합니다. 사용하시겠습니까?`;
+ $("modal-actions").innerHTML='<button class="button button-quiet" id="modal-cancel">취소</button><button class="button button-secondary" id="modal-confirm">확인</button>';
+ $("modal-backdrop").hidden=false;
+ $("modal-cancel").onclick=()=>$("modal-backdrop").hidden=true;
+ $("modal-confirm").onclick=()=>{snap();$("modal-backdrop").hidden=true;log("[스킬] 사용","important",c.name);advanceTurn(cid);};
+}
 function gmHpAdjust(cid,sign){const c=get(roster,cid);if(!c)return;const raw=prompt(`${c.name} HP를 ${sign>0?"얼마나 회복":"얼마나 차감"}할까요?`,"10");if(raw===null)return;const amount=Math.max(0,Number(raw)||0);if(!amount){toast("0보다 큰 숫자를 입력하세요.");return;}snap();const before=c.curHp;c.curHp=clamp(c.curHp+sign*amount,0,c.maxHp);if(c.curHp>0)c.dead=false;else c.dead=true;log(`GM HP 조정: ${before} → ${c.curHp} (${sign>0?"회복":"차감"} ${amount})`,'system',c.name);render();}
 function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`,"normal",c.name);if(r.success){c.escaped=true;log(`도주 성공`,"important",c.name);}else log(`도주 실패`,"normal",c.name);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
 function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}const idx=roundOrder.indexOf(from);let next=null;for(let i=idx+1;i<roundOrder.length;i++){const c=get(roster,roundOrder[i]);if(alive(c)){next=c;break;}}if(next){currentId=next.id;}else{beginRound();}log(`▶ 다음 차례`,"normal",get(roster,currentId)?.name||"");render();}

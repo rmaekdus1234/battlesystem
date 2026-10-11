@@ -50,3 +50,42 @@
 .modal-backdrop{background:color-mix(in srgb,var(--bg) 75%,#000 25%)!important}
 .theme-setting>label{color:var(--text)!important}
 .icon-button{color:var(--muted)!important}
+
+/* v15 fixes: theme-safe hover and light-theme readability */
+.button-primary:hover{background:var(--accent)!important;filter:brightness(1.08);}
+.button-secondary:hover{background:var(--button-bg)!important;filter:brightness(1.08);}
+.button-quiet:hover{background:var(--button-bg)!important;color:var(--text)!important;}
+.brand-mark:hover,.bd-settings:hover{background:var(--accent)!important;filter:brightness(1.08);}
+
+[data-theme="light"] .field-grid label,
+[data-theme="light"] .setting-row,
+[data-theme="light"] .filter-label,
+[data-theme="light"] .library-card-actions,
+[data-theme="light"] .small-note,
+[data-theme="light"] .rules-note,
+[data-theme="light"] .roster-toolbar p,
+[data-theme="light"] .card-title p,
+[data-theme="light"] .hp-meta span:first-child,
+[data-theme="light"] .theme-setting>label,
+[data-theme="light"] .modal>p{color:var(--text)!important;}
+[data-theme="light"] .field-grid label span,
+[data-theme="light"] .helper-text,
+[data-theme="light"] .log-footer,
+[data-theme="light"] .sidebar-footer,
+[data-theme="light"] .log-time,
+[data-theme="light"] .log-empty,
+[data-theme="light"] .empty-state,
+[data-theme="light"] .library-stat small{color:var(--muted)!important;}
+[data-theme="light"] .rules-note strong,
+[data-theme="light"] .rules-note p,
+[data-theme="light"] .stat-table th,
+[data-theme="light"] .stat-table tbody th{color:var(--text)!important;}
+[data-theme="light"] .stat-chip{color:var(--text)!important;}
+[data-theme="light"] .card-delete{color:var(--muted);}
+[data-theme="light"] .theme-modal input[type=text]{background:var(--field)!important;color:var(--text)!important;border-color:var(--line)!important;}
+[data-theme="light"] .library-filter-toolbar .filter-button{color:var(--muted);}
+[data-theme="light"] .library-filter-toolbar .filter-button.active{color:var(--text)!important;}
+[data-theme="light"] .team-A .team-tag,[data-theme="light"] .team-B .team-tag,[data-theme="light"] .team-N .team-tag{background:var(--panel2);}
+[data-theme="light"] .reaction-box{background:var(--panel2);border-color:var(--line);}
+[data-theme="light"] .reaction-box p{color:var(--text);}
+[data-theme="light"] .modal-backdrop{background:color-mix(in srgb,var(--bg) 75%,#000 25%)!important;}

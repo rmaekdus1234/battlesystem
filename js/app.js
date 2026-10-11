@@ -5,12 +5,12 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const KEY="battleDesk.custom.v10";
 const LEGACY_KEYS=["battleDesk.custom.v9","battleDesk.custom.v8","battleDesk.custom.v6","battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
 const DEFAULT_STATS=[
- {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180],evasion:[100,100,100,100,100],escape:[100,100,100,100,100]},
- {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
- {id:"def",name:"방어(DEF)",type:"number",role:"defense",defaults:[10,20,30,40,50],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
- {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45],evasion:[5,15,25,35,45],escape:[5,15,25,35,45]},
- {id:"heal",name:"치유(HEAL)",type:"number",role:"heal",defaults:["10","1d6+2","2d6","2d8+2","3d8"],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]},
- {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11],evasion:[0,0,0,0,0],escape:[0,0,0,0,0]}
+ {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180]},
+ {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"]},
+ {id:"def",name:"방어(DEF)",type:"number",role:"defense",defaults:[10,20,30,40,50]},
+ {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45],escape:[5,15,25,35,45]},
+ {id:"heal",name:"치유(HEAL)",type:"number",role:"heal",defaults:["10","1d6+2","2d6","2d8+2","3d8"]},
+ {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11]}
 ];
 let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#b9f36a",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -55,9 +55,7 @@ function normalizeStats(source){
   // 기본값은 항상 최소 5줄을 유지하고, 사용자가 추가한 단계는 뒤에 보존합니다.
   if(vals.length>=5)target.defaults=vals.slice(0,100);
   else if(vals.length>0)target.defaults=target.defaults.map((v,i)=>vals[i]!==undefined?vals[i]:v);
-  target.evasion=Array.isArray(saved.evasion)?saved.evasion.slice(0,100):Array.from({length:target.defaults.length},(_,i)=>target.defaults[i]);
   target.escape=Array.isArray(saved.escape)?saved.escape.slice(0,100):Array.from({length:target.defaults.length},(_,i)=>target.defaults[i]);
-  while(target.evasion.length<target.defaults.length)target.evasion.push(target.evasion[target.evasion.length-1]??target.defaults[target.evasion.length-1]??0);
   while(target.escape.length<target.defaults.length)target.escape.push(target.escape[target.escape.length-1]??target.defaults[target.escape.length-1]??0);
  });
  const n=Math.max(5,...result.map(s=>s.defaults.length));
@@ -95,12 +93,12 @@ function hexRgb(hex){const h=String(hex||"").replace("#","");return {r:parseInt(
 function rgbHex(r,g,b){return "#"+[r,g,b].map(v=>Math.round(clamp(v,0,255)).toString(16).padStart(2,"0")).join("");}
 function mixHex(a,b,t){const x=hexRgb(a),y=hexRgb(b);return rgbHex(x.r+(y.r-x.r)*t,x.g+(y.g-x.g)*t,x.b+(y.b-x.b)*t);}
 function applyTheme(){
- const bg=theme.background, rgb=hexRgb(bg), luminance=(0.2126*rgb.r+0.7152*rgb.g+0.0722*rgb.b)/255, light=luminance>=0.58;
+ const bg=theme.background, rgb=hexRgb(bg), luminance=(0.2126*rgb.r+0.7152*rgb.g+0.0722*rgb.b)/255, light=luminance>=0.58, accentRgb=hexRgb(theme.accent), accentLuminance=(0.2126*accentRgb.r+0.7152*accentRgb.g+0.0722*accentRgb.b)/255, accentInk=accentLuminance>=0.62?"#18200e":"#ffffff";
  const panel=light?mixHex(bg,"#000000",.045):mixHex(bg,"#ffffff",.075), panel2=light?mixHex(bg,"#000000",.085):mixHex(bg,"#ffffff",.12);
  const line=light?mixHex(bg,"#000000",.16):mixHex(bg,"#ffffff",.16), text=light?"#20242c":"#f2f4fb", muted=light?"#606774":"#9299ad", field=light?mixHex(bg,"#000000",.075):mixHex(bg,"#000000",.32), logBg=light?mixHex(bg,"#000000",.065):mixHex(bg,"#000000",.48), button=light?mixHex(bg,"#000000",.08):mixHex(bg,"#ffffff",.09), table=light?mixHex(bg,"#000000",.11):mixHex(bg,"#000000",.18);
  const root=document.documentElement;
- [["--accent",theme.accent],["--bg",bg],["--panel",panel],["--panel2",panel2],["--panel-soft",panel2],["--line",line],["--text",text],["--muted",muted],["--field",field],["--log-bg",logBg],["--button-bg",button],["--table-bg",table],["--accent-ink",light?"#ffffff":"#18200e"],["--theme-shadow",light?"#00000022":"#00000088"]].forEach(([k,v])=>root.style.setProperty(k,v));
- root.style.setProperty("--theme-light",light?"1":"0"); root.style.colorScheme=light?"light":"dark";
+ [["--accent",theme.accent],["--bg",bg],["--panel",panel],["--panel2",panel2],["--panel-soft",panel2],["--line",line],["--text",text],["--muted",muted],["--field",field],["--log-bg",logBg],["--button-bg",button],["--table-bg",table],["--accent-ink",accentInk],["--theme-shadow",light?"#00000022":"#00000088"]].forEach(([k,v])=>root.style.setProperty(k,v));
+ root.style.setProperty("--theme-light",light?"1":"0"); root.dataset.theme=light?"light":"dark"; root.style.colorScheme=light?"light":"dark";
  const meta=document.querySelector("meta[name=theme-color]");if(meta)meta.content=theme.background;
 }
 function renderThemeControls(){["accent","background"].forEach(k=>{const c=$("theme-"+k+"-color"),h=$("theme-"+k+"-hex");if(c)c.value=theme[k];if(h)h.value=theme[k];});applyTheme();}
@@ -113,8 +111,8 @@ function renderFactionControls(){
 }
 function renderStats(){
  const n=rowCount();
- $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role!=="hp"?` <button title="이 능력치 열 삭제" data-remove-stat="${s.id}">×</button>`:""}</th>`).join("")}<th>회피</th><th>도주</th></tr>`;
- $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" type="text"></td>`).join("")}<td><input type="number" min="0" data-rule="evasion" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.evasion?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td><td><input type="number" min="0" data-rule="escape" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.escape?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td></tr>`).join("");
+ $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role!=="hp"?` <button title="이 능력치 열 삭제" data-remove-stat="${s.id}">×</button>`:""}</th>`).join("")}<th>도주</th></tr>`;
+ $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" type="text"></td>`).join("")}<td><input type="number" min="0" data-rule="escape" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.escape?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td></tr>`).join("");
  $("custom-stat-fields").innerHTML=stats.map(s=>`<label>${esc(s.name)} <span>스탯 1~${n}</span><input class="wide-input" data-character-stat="${s.id}" type="number" min="1" max="${n}" step="1" value="1" required></label>`).join("");
 }
 function setFormFromCharacter(c){
@@ -172,19 +170,67 @@ function editCharacter(cid){const c=get(library,cid);if(c)setFormFromCharacter(c
 function editRoster(cid){const r=get(roster,cid);if(!r)return;const base=get(library,r.libraryId);if(base)setFormFromCharacter(base);}
 function addRoster(){const ids=[...document.querySelectorAll("[data-library-check]:checked")].map(x=>x.dataset.libraryCheck);if(!ids.length){toast("전투에 추가할 캐릭터를 선택하세요.");return;}const selected=ids.map(id=>get(library,id)).filter(Boolean).filter(c=>!roster.some(r=>r.libraryId===c.id));if(!selected.length){toast("선택한 캐릭터가 이미 전투 인원에 있습니다.");return;}snap();selected.forEach(c=>{syncCharacter(c,true);roster.push({...clone(c),id:makeId("r"),libraryId:c.id,curHp:c.maxHp,dead:false,escaped:false});});render();toast(`${selected.length}명의 캐릭터를 전투 인원에 추가했습니다.`);}
 function resolveRuleRoll(c,kind){
- const ag=agility(c);
  const s=stat(c,"agility");
- const table=kind==="evasion"?s?.evasion:s?.escape;
- const threshold=Math.max(0,Number(table?.[Math.max(0,agilityLevel(c)-1)])||0);
+ let threshold=0;
+ if(kind==="evasion"){
+  // 회피는 별도 테이블 값이 아니라 캐릭터의 AGI 스탯 수치를 그대로 사용합니다.
+  const parsed=parseExpression(c.values?.[s?.id]??0);
+  threshold=parsed.kind==="percent"?parsed.value:parsed.kind==="dice"?roll(parsed.raw).value:parsed.value;
+ }else{
+  const table=s?.escape;
+  threshold=Number(table?.[Math.max(0,agilityLevel(c)-1)])||0;
+ }
+ threshold=Math.max(0,Math.min(100,Number(threshold)||0));
  const rollValue=1+Math.floor(Math.random()*100);
  return {roll:rollValue,max:100,threshold,success:rollValue<=threshold};
 }
 function agilityLevel(c){const s=stat(c,"agility");return getCharacterStat(c,s);}
-function agility(c){const s=stat(c,"agility");const n=Number(c.values?.[s?.id]);return Number.isFinite(n)?n:0;}
-// 민첩 대항: 양쪽이 자신의 AGI 범위에서 1회 굴림(1~AGI), 높은 값 승리. 동률은 재굴림.
-function agilityDice(c){const s=stat(c,"agility");const n=clamp(Number(c.values?.[s?.id])||1,1,100);return 1+Math.floor(Math.random()*n);}
-function rollRoundOrder(){const active=roster.filter(alive);if(!active.length)return [];if(mode==="agility-dice"){const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');rolls.forEach(x=>{const c=get(roster,x.id);log(`1d민첩(${getCharacterStat(c,stat(c,"agility"))}) → ${x.roll}`,"normal",c.name);});rolls.sort((a,b)=>b.roll-a.roll);let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}for(const g of groups)if(g.length>1){for(let i=1;i<g.length;i++){const a=get(roster,g[i-1].id),b=get(roster,g[i].id),w=contest(a,b);if(w===b.id){const tmp=g[i-1];g[i-1]=g[i];g[i]=tmp;}}}roundOrder=groups.flat().map(x=>x.id);log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}else{roundOrder=active.slice().sort((a,b)=>agility(b)-agility(a)).map(c=>c.id);log(`◆ ${round}라운드 민첩순 정렬`,'system');log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");}return roundOrder;}
-function contest(a,b){let guard=0;while(guard++<100){const ra=agilityDice(a),rb=agilityDice(b);log(`민첩 다이스 재판정: ${a.name} ${ra} vs ${b.name} ${rb}`);if(ra!==rb)return ra>rb?a.id:b.id;}return a.id;}
+// 선공 및 민첩 다이스는 능력치 테이블의 AGI 값이 아니라 '스탯 번호' 자체를 사용합니다.
+function agility(c){return agilityLevel(c);}
+function agilityDice(c){return 1+Math.floor(Math.random()*clamp(agilityLevel(c),1,100));}
+function shuffle(list){for(let i=list.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[list[i],list[j]]=[list[j],list[i]];}return list;}
+function allAgilityOne(list){return list.length>0&&list.every(c=>agilityLevel(c)===1);}
+function rankByAgilityDice(chars){
+ if(chars.length<=1)return chars.slice();
+ if(allAgilityOne(chars)){const out=chars.slice();shuffle(out);return out;}
+ const scored=chars.map(c=>({c,roll:agilityDice(c)}));
+ scored.sort((a,b)=>b.roll-a.roll);
+ log(`민첩 다이스 재판정: ${scored.map(x=>`${x.c.name} ${x.roll}`).join(" vs ")}`);
+ const top=scored[0].roll;
+ const winners=scored.filter(x=>x.roll===top).map(x=>x.c);
+ const rest=scored.filter(x=>x.roll!==top).map(x=>x.c);
+ if(winners.length===1)return [winners[0],...rankByAgilityDice(rest)];
+ if(allAgilityOne(winners)){const randomWinners=winners.slice();shuffle(randomWinners);return [...randomWinners,...rankByAgilityDice(rest)];}
+ return [...rankByAgilityDice(winners),...rankByAgilityDice(rest)];
+}
+function rollRoundOrder(){
+ const active=roster.filter(alive);if(!active.length)return [];
+ if(mode==="agility-dice"){
+  const rolls=active.map(c=>({id:c.id,roll:agilityDice(c)}));
+  log(`◆ ${round}라운드 민첩 다이스 판정 시작`,'system');
+  rolls.forEach(x=>{const c=get(roster,x.id);log(`1d${agilityLevel(c)} → ${x.roll}`,"normal",c.name);});
+  rolls.sort((a,b)=>b.roll-a.roll);
+  let groups=[];for(let i=0;i<rolls.length;){let j=i+1;while(j<rolls.length&&rolls[j].roll===rolls[i].roll)j++;groups.push(rolls.slice(i,j));i=j;}
+  const ordered=[];
+  for(const g of groups){
+   const chars=g.map(x=>get(roster,x.id));
+   if(chars.length>1&&allAgilityOne(chars)){shuffle(chars);log(`민첩 스탯 1 동률 → 무작위 순서 적용`,'system');}
+   else if(chars.length>1){ordered.push(...rankByAgilityDice(chars));continue;}
+   ordered.push(...chars);
+  }
+  roundOrder=ordered.map(c=>c.id);
+  log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");
+ }else{
+  const groups=[];
+  const sorted=active.slice().sort((a,b)=>agility(b)-agility(a));
+  for(const c of sorted){const last=groups[groups.length-1];if(last&&agility(last[0])===agility(c))last.push(c);else groups.push([c]);}
+  groups.forEach(g=>{if(g.length>1&&allAgilityOne(g)){shuffle(g);log(`민첩 스탯 1 동률 → 무작위 순서 적용`,'system');}});
+  roundOrder=groups.flat().map(c=>c.id);
+  log(`◆ ${round}라운드 민첩순 정렬`,'system');
+  log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");
+ }
+ return roundOrder;
+}
 function beginRound(){round++;roundOrder=rollRoundOrder();currentId=roundOrder.find(id=>alive(get(roster,id)))||null;log(`━━ ${round}라운드 시작 · ${get(roster,currentId)?.name||"없음"} 선공 ━━`,'system');}
 function startBattle(){if(!roster.length){toast("전투 인원을 먼저 편성하세요.");return;}snap();started=true;pending=null;round=0;roundOrder=[];mode=$("initiative-mode").value;beginRound();render();}
 function startAttack(aid,tid){const a=get(roster,aid),t=get(roster,tid);if(!started||!a||!t||aid!==currentId||!alive(a)||!alive(t))return;snap();pending={attackerId:aid,targetId:tid};log(`→ ${t.name} 공격 선언`,"normal",a.name);render();}

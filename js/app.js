@@ -5,12 +5,13 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const KEY="battleDesk.custom.v10";
 const LEGACY_KEYS=["battleDesk.custom.v9","battleDesk.custom.v8","battleDesk.custom.v6","battleDesk.custom.v5","battleDesk.custom.v4","battleDesk.custom.v3"];
 const DEFAULT_STATS=[
- {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[100,120,140,160,180]},
- {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["1d4","1d6","1d8","1d10","2d6"]},
- {id:"def",name:"방어(DEF)",type:"number",role:"defense",defaults:[10,20,30,40,50]},
- {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[5,15,25,35,45],escape:[5,15,25,35,45]},
- {id:"heal",name:"치유(HEAL)",type:"number",role:"heal",defaults:["10","1d6+2","2d6","2d8+2","3d8"]},
- {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[5,7,9,10,11]}
+ {id:"hp",name:"체력(HP)",type:"number",role:"hp",defaults:[125,150,175,200,225,250]},
+ {id:"atk",name:"공격(ATK)",type:"dice",role:"attack",defaults:["2d10+18","2d10+21","2d10+24","2d10+27","2d10+30","2d10+33"]},
+ {id:"ctr",name:"반격(CTR)",type:"dice",role:"counter",defaults:["3d10+3","3d10+6","3d10+9","3d10+12","3d10+15","3d10+18"]},
+ {id:"def",name:"방어(DEF)",type:"dice",role:"defense",defaults:["2d5+3","2d5+6","2d5+9","2d5+12","2d5+15","2d5+18"]},
+ {id:"agi",name:"민첩(AGI)",type:"number",role:"agility",defaults:[20,30,40,50,60,70],escape:[10,15,20,25,30,35]},
+ {id:"heal",name:"치유(HEAL)",type:"dice",role:"heal",defaults:["2d10+10","2d10+20","2d10+30","2d10+40","2d10+50","2d10+60"]},
+ {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[12,24,36,48,60,72]}
 ];
 let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#b9f36a",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -58,7 +59,7 @@ function normalizeStats(source){
   target.escape=Array.isArray(saved.escape)?saved.escape.slice(0,100):Array.from({length:target.defaults.length},(_,i)=>target.defaults[i]);
   while(target.escape.length<target.defaults.length)target.escape.push(target.escape[target.escape.length-1]??target.defaults[target.escape.length-1]??0);
  });
- const n=Math.max(5,...result.map(s=>s.defaults.length));
+ const n=Math.max(6,...result.map(s=>s.defaults.length));
  result.forEach(s=>{while(s.defaults.length<n)s.defaults.push(s.defaults[s.defaults.length-1]??"");});
  return result;
 }
@@ -111,7 +112,7 @@ function renderFactionControls(){
 }
 function renderStats(){
  const n=rowCount();
- $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role!=="hp"?` <button title="이 능력치 열 삭제" data-remove-stat="${s.id}">×</button>`:""}</th>`).join("")}<th>도주</th></tr>`;
+ $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}</th>`).join("")}<th>도주</th></tr>`;
  $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" type="text"></td>`).join("")}<td><input type="number" min="0" data-rule="escape" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.escape?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td></tr>`).join("");
  $("custom-stat-fields").innerHTML=stats.map(s=>`<label>${esc(s.name)} <span>스탯 1~${n}</span><input class="wide-input" data-character-stat="${s.id}" type="number" min="1" max="${n}" step="1" value="1" required></label>`).join("");
 }
@@ -171,18 +172,12 @@ function editRoster(cid){const r=get(roster,cid);if(!r)return;const base=get(lib
 function addRoster(){const ids=[...document.querySelectorAll("[data-library-check]:checked")].map(x=>x.dataset.libraryCheck);if(!ids.length){toast("전투에 추가할 캐릭터를 선택하세요.");return;}const selected=ids.map(id=>get(library,id)).filter(Boolean).filter(c=>!roster.some(r=>r.libraryId===c.id));if(!selected.length){toast("선택한 캐릭터가 이미 전투 인원에 있습니다.");return;}snap();selected.forEach(c=>{syncCharacter(c,true);roster.push({...clone(c),id:makeId("r"),libraryId:c.id,curHp:c.maxHp,dead:false,escaped:false});});render();toast(`${selected.length}명의 캐릭터를 전투 인원에 추가했습니다.`);}
 function resolveRuleRoll(c,kind){
  const s=stat(c,"agility");
- let threshold=0;
- if(kind==="evasion"){
-  // 회피는 별도 테이블 값이 아니라 캐릭터의 AGI 스탯 수치를 그대로 사용합니다.
-  const parsed=parseExpression(c.values?.[s?.id]??0);
-  threshold=parsed.kind==="percent"?parsed.value:parsed.kind==="dice"?roll(parsed.raw).value:parsed.value;
- }else{
-  const table=s?.escape;
-  threshold=Number(table?.[Math.max(0,agilityLevel(c)-1)])||0;
- }
+ const agilityValue=Math.max(0,Number(c.values?.[s?.id])||0);
+ let threshold=kind==="evasion"?agilityValue:kind==="counter"?agilityValue-10:agilityValue-(agilityValue/2);
  threshold=Math.max(0,Math.min(100,Number(threshold)||0));
  const rollValue=1+Math.floor(Math.random()*100);
- return {roll:rollValue,max:100,threshold,success:rollValue<=threshold};
+ const success=kind==="evasion"?rollValue<threshold:rollValue<=threshold;
+ return {roll:rollValue,max:100,threshold,success};
 }
 function agilityLevel(c){const s=stat(c,"agility");return getCharacterStat(c,s);}
 // 선공 및 민첩 다이스는 능력치 테이블의 AGI 값이 아니라 '스탯 번호' 자체를 사용합니다.
@@ -281,8 +276,8 @@ function react(defenderId,reaction){
  const action=pending;pending=null;
  const atk=resolveStat(a,"attack");
  let attack=Math.max(0,atk.value);
- if(reaction!=="counter"){const crit=applyCritical(attack,a,"공격");attack=crit.value;}
- log(`공격 굴림: ${atk.desc}${reaction==="counter"?" · 반격이므로 크리티컬 제외":""}`,"normal",a.name);
+ const crit=applyCritical(attack,a,"공격");attack=crit.value;
+ log(`공격 굴림: ${atk.desc}`,"normal",a.name);
  if(reaction==="guard"){
   const info=resolveDefenseBlock(d,attack,true);
   defenseLog(`대신 방어 (${target.name})`,d,target,info);
@@ -292,11 +287,17 @@ function react(defenderId,reaction){
   defenseLog(`방어`,d,target,info);
   applyDamage(d,attack-info.block,"방어 후");
  }else if(reaction==="counter"){
-  const info=resolveDefenseBlock(d,attack,false),counter=Math.min(attack,info.block);
-  defenseLog(`반격`,d,target,{...info,block:counter,applied:info.kind==="percent"?info.applied:counter});
-  applyDamage(d,attack-counter,"반격 후");if(alive(a))applyDamage(a,counter,"반격 피해");
+  const chance=resolveRuleRoll(d,"counter");
+  log(`반격 판정: 1d100=${chance.roll} ≤ AGI-10 (${chance.threshold}) → ${chance.success?"성공":"실패"}`,chance.success?"success":"failure",d.name);
+  if(chance.success){
+   const ctr=resolveStat(d,"counter");
+   const counter=Math.max(0,Math.round(ctr.value));
+   log(`CTR 굴림: ${ctr.desc} → 반격값 ${counter}`,"normal",d.name);
+   applyDamage(d,Math.max(0,attack-counter),"반격 후");
+   if(alive(a))applyDamage(a,counter,"반격 피해");
+  }else applyDamage(d,attack,"반격 실패 후");
  }else if(reaction==="evasion"){
-  const r=evasionCheck(d);log(`회피 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`,"normal",d.name);if(r.success)log(`회피 성공`,"important",d.name);else applyDamage(d,attack,"회피 실패 후");
+  const r=evasionCheck(d);log(`회피 판정: 1d100=${r.roll} < AGI (${r.threshold}) → ${r.success?"성공":"실패"}`,"normal",d.name);if(r.success)log(`회피 성공`,"important",d.name);else applyDamage(d,attack,"회피 실패 후");
  }else applyDamage(d,attack,"피해");
  const winner=checkVictory();if(winner){started=false;currentId=null;render();return;}advanceTurn(action.attackerId);
 }
@@ -334,7 +335,6 @@ on("mapping-body","change",e=>{
  if(el.matches("[data-rule]")){snap();const s=stats.find(x=>x.role==="agility");if(!s)return;s.evasion=s.evasion||Array(s.defaults.length).fill(0);s.escape=s.escape||Array(s.defaults.length).fill(0);const v=Math.max(0,Number(el.value)||0);if(el.dataset.rule==="evasion")s.evasion[i]=v;else s.escape[i]=v;save();renderStats();return;}
  const key=el.dataset.stat;if(!key)return;const s=stats.find(x=>x.id===key);if(!s||i>=s.defaults.length)return;snap();s.defaults[i]=el.value.trim() || "0";library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));render();
 });
-on("mapping-head","click",e=>{const b=e.target.closest("[data-remove-stat]");if(b)toast("기본 전투 능력치는 현재 삭제할 수 없습니다.");});
 on("add-stat-row","click",addStatRow);
 on("remove-stat-row","click",removeStatRow);
 on("character-list","click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const {act,id:cid,target,reaction}=b.dataset;if(act==="attack")startAttack(cid,target);else if(act==="heal")healAction(cid,target);else if(act==="skill")skillAction(cid);else if(act==="gm-heal")gmHpAdjust(cid,1);else if(act==="gm-damage")gmHpAdjust(cid,-1);else if(act==="react")react(cid,reaction);else if(act==="escape")escape(cid);else if(act==="skip")advanceTurn(cid);else if(act==="edit-roster")editRoster(cid);else if(act==="remove-roster"){snap();roster=roster.filter(c=>c.id!==cid);if(currentId===cid)currentId=null;pending=null;render();}});

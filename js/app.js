@@ -13,7 +13,7 @@ const DEFAULT_STATS=[
  {id:"heal",name:"치유(HEAL)",type:"dice",role:"heal",defaults:["2d10+2","2d10+4","2d10+6","2d10+8","2d10+10","2d10+12"]},
  {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[12,24,36,48,60,72]}
 ];
-let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#b9f36a",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
+let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", defenseDamageMode="half", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#b9f36a",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -22,7 +22,7 @@ const alive=c=>!!c&&!c.dead&&!c.escaped;
 const stat=(c,role)=>stats.find(s=>s.role===role);
 const rowCount=()=>Math.max(1,...stats.map(s=>s.defaults.length));
 
-function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,theme,round,roundOrder});}
+function snapshot(){return clone({stats,library,roster,logs,currentId,pending,started,mode,defenseDamageMode,factionNames,factionColors,theme,round,roundOrder});}
 function save(){
  try{
   const payload=JSON.stringify(snapshot());
@@ -41,7 +41,7 @@ function load(){
   if(!raw){stats=clone(DEFAULT_STATS);return;}
   const d=JSON.parse(raw);
   stats=normalizeStats(d.stats||clone(DEFAULT_STATS)); library=Array.isArray(d.library)?d.library:[]; roster=Array.isArray(d.roster)?d.roster:[];
-  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#b9f36a",background:validHex(d.theme?.background)?d.theme.background:"#11131a"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
+  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; defenseDamageMode=d.defenseDamageMode==="full"?"full":"half"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#b9f36a",background:validHex(d.theme?.background)?d.theme.background:"#11131a"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
   migrateCharacters();
  }catch(e){console.warn("저장 데이터 불러오기 실패",e);}
 }
@@ -123,8 +123,8 @@ function renderFactionControls(){
 }
 function renderStats(){
  const n=rowCount();
- $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role==="counter"?` <button type="button" class="table-column-delete" data-delete-stat="${s.id}" title="CTR 열 삭제" aria-label="CTR 열 삭제">×</button>`:""}</th>`).join("")}<th>도주</th></tr>`;
- $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" type="text"></td>`).join("")}<td><input type="number" min="0" data-rule="escape" data-row="${i}" value="${esc(stats.find(s=>s.role==="agility")?.escape?.[i]??stats.find(s=>s.role==="agility")?.defaults?.[i]??0)}"></td></tr>`).join("");
+ $("mapping-head").innerHTML=`<tr><th>스탯</th>${stats.map(s=>`<th>${esc(s.name)}${s.role==="counter"?` <button type="button" class="table-column-delete" data-delete-stat="${s.id}" title="CTR 열 삭제" aria-label="CTR 열 삭제">×</button>`:""}</th>`).join("")}</tr>`;
+ $("mapping-body").innerHTML=Array.from({length:n},(_,i)=>`<tr><th>${i+1}</th>${stats.map(s=>`<td><input aria-label="스탯 ${i+1} ${esc(s.name)}" data-stat="${s.id}" data-row="${i}" value="${esc(s.defaults[i]??"")}" type="text"></td>`).join("")}</tr>`).join("");
  $("custom-stat-fields").innerHTML=stats.filter(s=>s.role!=="counter").map(s=>`<label>${esc(s.name)} <span>스탯 1~${n}</span><input class="wide-input" data-character-stat="${s.id}" type="number" min="1" max="${n}" step="1" value="1" required></label>`).join("");
 }
 function setFormFromCharacter(c){
@@ -273,11 +273,11 @@ function resolveDefenseBlock(c,attack,critical=true){
  const base= Math.max(0,Number(resolved.value)||0);
  const cr=critical?applyCritical(base,c,"방어"):null;
  const applied=Math.max(0,Math.round(cr?cr.value:base));
- return {kind:"flat",input:parsed.raw,base,applied,block:applied,desc:resolved.desc};
+ return {kind:"flat",input:parsed.raw,base,applied,block:applied/(defenseDamageMode==="half"?2:1),desc:resolved.desc};
 }
 function defenseLog(label,d,target,info){
  if(info.kind==="percent") log(`${label}: ${info.input} → 적용 ${info.applied}% → ${info.block} 피해 경감`,"normal",d.name);
- else log(`${label}: ${info.input} → 적용 ${info.applied} → ${info.block} 피해 경감`,"normal",d.name);
+ else log(`${label}: ${info.input} → 적용 DEF ${info.applied}${defenseDamageMode==="half"?" / 2":""} = ${info.block} 피해 경감`,"normal",d.name);
 }
 function react(defenderId,reaction){
  if(!pending)return;
@@ -316,7 +316,7 @@ function react(defenderId,reaction){
  }else applyDamage(d,attack,"피해");
  const winner=checkVictory();if(winner){started=false;currentId=null;render();return;}advanceTurn(action.attackerId);
 }
-function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const before=t.curHp;const amount=Math.max(0,Math.round(r.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`→ ${t.name} 치유: ${r.desc} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal",c.name);advanceTurn(cid);}
+function healAction(cid,tid){const c=get(roster,cid),t=get(roster,tid);if(!started||!c||!t||cid!==currentId||!alive(c)||!alive(t))return;snap();const r=resolveStat(c,"heal",{percentBase:t.maxHp});const crit=applyCritical(r.value,c,"치유");const before=t.curHp;const amount=Math.max(0,Math.round(crit.value));t.curHp=clamp(t.curHp+amount,0,t.maxHp);const actual=t.curHp-before;log(`→ ${t.name} 치유: ${r.desc} / 크리티컬 적용 ${crit.value} / 실제 회복 ${actual} (HP ${before} → ${t.curHp})`,"heal",c.name);advanceTurn(cid);}
 function skillAction(cid){const c=get(roster,cid);if(!started||!c||cid!==currentId||!alive(c))return;
  $("modal-title").textContent="스킬 사용";
  $("modal-description").textContent=`${c.name}이(가) 스킬을 사용합니다. 사용하시겠습니까?`;
@@ -355,6 +355,7 @@ on("add-stat-row","click",addStatRow);
 on("remove-stat-row","click",removeStatRow);
 on("character-list","click",e=>{const b=e.target.closest("[data-act]");if(!b)return;const {act,id:cid,target,reaction}=b.dataset;if(act==="attack")startAttack(cid,target);else if(act==="heal")healAction(cid,target);else if(act==="skill")skillAction(cid);else if(act==="gm-heal")gmHpAdjust(cid,1);else if(act==="gm-damage")gmHpAdjust(cid,-1);else if(act==="react")react(cid,reaction);else if(act==="escape")escape(cid);else if(act==="skip")advanceTurn(cid);else if(act==="edit-roster")editRoster(cid);else if(act==="remove-roster"){snap();roster=roster.filter(c=>c.id!==cid);if(currentId===cid)currentId=null;pending=null;render();}});
 on("start-battle","click",startBattle);
+on("defense-damage-mode","change",e=>{defenseDamageMode=e.target.value==="full"?"full":"half";save();toast(defenseDamageMode==="half"?"방어 피해 계산: ATK - DEF / 2":"방어 피해 계산: ATK - DEF");});
 on("next-turn","click",()=>{if(started&&!pending)advanceTurn(currentId);});
 on("undo","click",undo);
 
@@ -378,6 +379,11 @@ on("download-log","click",()=>{const a=document.createElement("a"),blob=new Blob
 on("copy-log","click",async()=>{try{const text=logs.map(x=>`[${x.actor?x.actor+" | ":""}${x.time}] ${x.message}`).join("\n");if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(text);else{const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();}toast("로그 복사 완료");}catch(e){toast("복사할 수 없습니다");}});
 on("clear-log","click",()=>{if(confirm("로그를 비울까요?")){logs=[];renderLogs();save();}});
 on("close-modal","click",()=>{$("modal-backdrop").hidden=true;});
+
+on("help-button","click",()=>{$("help-backdrop").hidden=false;});
+on("close-help","click",()=>{$("help-backdrop").hidden=true;});
+on("help-backdrop","click",e=>{if(e.target===$("help-backdrop"))$("help-backdrop").hidden=true;});
+
 on("theme-settings","click",()=>{$("theme-backdrop").hidden=false;renderThemeControls();});
 on("close-theme","click",()=>{$("theme-backdrop").hidden=true;});
 on("theme-backdrop","click",e=>{if(e.target===$("theme-backdrop"))$("theme-backdrop").hidden=true;});
@@ -390,5 +396,5 @@ on("theme-background-hex","change",e=>{const v=e.target.value.trim();if(!validHe
 
 load();
 if(mode==="contest-each")mode="agility-dice"; const initMode=$("initiative-mode");if(initMode)initMode.value=mode;
-renderStats();render();
+renderStats();renderThemeControls();const damageMode=$("defense-damage-mode");if(damageMode)damageMode.value=defenseDamageMode;render();
 })();

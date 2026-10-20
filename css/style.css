@@ -89,3 +89,6 @@
 [data-theme="light"] .reaction-box{background:var(--panel2);border-color:var(--line);}
 [data-theme="light"] .reaction-box p{color:var(--text);}
 [data-theme="light"] .modal-backdrop{background:color-mix(in srgb,var(--bg) 75%,#000 25%)!important;}
+
+/* Keep the BD square synchronized with the selected accent color. */
+.brand-mark,.brand-mark:hover,.brand-mark:focus,.brand-mark:active{background:var(--accent)!important;color:var(--accent-ink)!important;box-shadow:none!important;}

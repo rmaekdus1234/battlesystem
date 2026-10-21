@@ -13,7 +13,7 @@ const DEFAULT_STATS=[
  {id:"heal",name:"치유(HEAL)",type:"dice",role:"heal",defaults:["2d10+2","2d10+4","2d10+6","2d10+8","2d10+10","2d10+12"]},
  {id:"luck",name:"행운(LUK)",type:"number",role:"luck",defaults:[12,24,36,48,60,72]}
 ];
-let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", defenseDamageMode="half", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#2878e5",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
+let stats=clone(DEFAULT_STATS), library=[], roster=[], logs=[], history=[], currentId=null, pending=null, started=false, mode="speed", defenseDamageMode="half", libraryFilter="all", factionNames={A:"A 진영",B:"B 진영"}, factionColors={A:"#4c8dff",B:"#e85d75"}, theme={accent:"#8fd3ff",background:"#11131a"}, round=0, roundOrder=[], toastTimer;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
@@ -41,7 +41,7 @@ function load(){
   if(!raw){stats=clone(DEFAULT_STATS);return;}
   const d=JSON.parse(raw);
   stats=normalizeStats(d.stats||clone(DEFAULT_STATS)); library=Array.isArray(d.library)?d.library:[]; roster=Array.isArray(d.roster)?d.roster:[];
-  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; defenseDamageMode=d.defenseDamageMode==="full"?"full":"half"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#2878e5",background:validHex(d.theme?.background)?d.theme.background:"#11131a"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
+  logs=Array.isArray(d.logs)?d.logs:[]; currentId=d.currentId||null; pending=d.pending||null; started=!!d.started; mode=d.mode||"speed"; defenseDamageMode=d.defenseDamageMode==="full"?"full":"half"; factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"}; factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"}; theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#8fd3ff",background:validHex(d.theme?.background)?d.theme.background:"#11131a"}; round=Number(d.round)||0; roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[]; 
   migrateCharacters();
  }catch(e){console.warn("저장 데이터 불러오기 실패",e);}
 }
@@ -134,9 +134,10 @@ function resetCharacterForm(){
  $("character-form").reset();$("character-form").removeAttribute("data-edit");$("character-form").querySelector('button[type="submit"]').textContent="＋ 전체 캐릭터에 저장";$("cancel-character-edit").hidden=true;renderStats();
 }
 function renderLibrary(){
- const filteredLibrary=library.filter(c=>libraryFilter==="all"||c.team===libraryFilter);
+ const query=($("character-search")?.value||"").trim().toLocaleLowerCase();
+ const filteredLibrary=library.filter(c=>(libraryFilter==="all"||c.team===libraryFilter)&&(!query||c.name.toLocaleLowerCase().includes(query)));
  $("library-count").textContent=library.length;
- $("library-list").innerHTML=filteredLibrary.length?filteredLibrary.map(c=>{const inRoster=roster.some(r=>r.libraryId===c.id);return `<article class="library-card team-${c.team}"><label class="library-check"><input type="checkbox" data-library-check="${c.id}" ${inRoster?"disabled":""}><span></span></label><div class="library-card-main"><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}</h4><p>${teamLabel(c.team)}${inRoster?" · 전투 참가 중":""}</p></div></div><div class="library-stat-grid">${stats.map(s=>`<div class="library-stat"><small>${esc(s.name)}</small><b>${esc(getCharacterStat(c,s))}</b></div>`).join("")}</div></div><div class="library-card-actions"><button class="button button-secondary" data-lib-edit="${c.id}">수정</button><button class="button button-quiet" data-lib-delete="${c.id}">삭제</button></div></article>`;}).join(""):'<div class="empty-state"><h3>저장된 캐릭터가 없습니다</h3><p>위에서 캐릭터를 등록하세요.</p></div>';
+ $("library-list").innerHTML=filteredLibrary.length?filteredLibrary.map(c=>{const inRoster=roster.some(r=>r.libraryId===c.id);return `<article class="library-card team-${c.team}"><label class="library-check"><input type="checkbox" data-library-check="${c.id}" ${inRoster?"disabled":""}><span></span></label><div class="library-card-main"><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}</h4><p>${teamLabel(c.team)}${inRoster?" · 전투 참가 중":""}</p></div></div><div class="library-stat-grid">${stats.filter(s=>s.role!=="counter").map(s=>`<div class="library-stat"><small>${esc(s.name)}</small><b>${esc(getCharacterStat(c,s))}</b></div>`).join("")}</div></div><div class="library-card-actions"><button class="button button-secondary" data-lib-edit="${c.id}">수정</button><button class="button button-quiet" data-lib-delete="${c.id}">삭제</button></div></article>`;}).join(""):'<div class="empty-state"><h3>저장된 캐릭터가 없습니다</h3><p>위에서 캐릭터를 등록하세요.</p></div>';
 }
 
 function renderLogs(){$("log-count").textContent=logs.length;$(`log-container`).innerHTML=logs.length?logs.map(x=>`<div class="log-entry ${esc(x.type)}"><div class="log-meta"><strong class="log-name">${esc(x.actor||"")}</strong><span class="log-time">${esc(x.time)}</span></div><div class="log-message">${esc(x.message)}</div></div>`).join(""):'<div class="log-empty">전투 기록이 여기에 쌓입니다.</div>';$(`log-container`).scrollTop=$(`log-container`).scrollHeight;}
@@ -155,8 +156,7 @@ function render(){
   else if(protector&&alive(c)){reactions=`<div class="reaction-box ally-reaction"><strong>🛡 대신 방어</strong><p>${esc(get(roster,pending.targetId)?.name||"아군")}을 대신해 공격을 받을 수 있습니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="guard" data-id="${c.id}">대신 방어</button></div></div>`;}
   return `<article style="--faction-color:${esc(factionColors[c.team]||"#667085")}" class="character-card team-${c.team} ${current?"current-turn":""} ${target?"targeting":""} ${protector?"guarding":""} ${inactive?"inactive":""} ${c.dead?"dead":""}"><button class="card-delete" title="전투 인원에서 제외" data-act="remove-roster" data-id="${c.id}">×</button><button class="card-edit" title="캐릭터 스탯 수정" data-act="edit-roster" data-id="${c.id}">✎</button><div class="card-top"><div class="avatar">${esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}${c.dead?'<span class="card-status">사망</span>':c.escaped?'<span class="card-status">도주</span>':""}</h4><p>${current?`제 ${round} 라운드 · 현재 차례`:inactive?"행동 불가":""}</p><span class="team-tag">${teamLabel(c.team)}</span></div></div><div class="hp-meta"><span>체력</span><strong>${c.curHp} / ${c.maxHp}</strong></div><div class="hp-track"><div class="hp-fill ${pct<25?"low":""}" style="width:${pct}%"></div></div><div class="stat-chips">${stats.filter(s=>s.role!=="hp"&&s.role!=="counter").map(s=>`<span class="stat-chip">${esc(s.name)} <b>${getCharacterStat(c,s)}</b></span>`).join("")}</div>${actions?`<div class="card-actions">${actions}</div>`:""}<div class="gm-actions"><button class="button button-gm" data-act="gm-heal" data-id="${c.id}">GM 회복</button><button class="button button-gm" data-act="gm-damage" data-id="${c.id}">GM HP 차감</button></div>${reactions}</article>`;
  };
- const query=($("character-search")?.value||"").trim().toLocaleLowerCase();
- const groups=["A","B"].map(team=>{const list=roster.filter(c=>c.team===team&&(!query||c.name.toLocaleLowerCase().includes(query)));return `<section class="roster-faction team-${team}"><div class="roster-faction-header"><h3>${teamLabel(team)}</h3><span>${list.length}명</span></div><div class="character-grid">${list.length?list.map(renderCard).join(""):`<div class="empty-state compact-empty">${query?'검색 결과가 없습니다.':'이 진영의 전투 인원이 없습니다.'}</div>`}</div></section>`;}).join("");
+ const groups=["A","B"].map(team=>{const list=roster.filter(c=>c.team===team);return `<section class="roster-faction team-${team}"><div class="roster-faction-header"><h3>${teamLabel(team)}</h3><span>${list.length}명</span></div><div class="character-grid">${list.length?list.map(renderCard).join(""):`<div class="empty-state compact-empty">この 진영의 전투 인원이 없습니다.</div>`}</div></section>`;}).join("");
  $("character-list").innerHTML=groups;
  renderLogs();save();
 }
@@ -185,7 +185,7 @@ function addRoster(){const ids=[...document.querySelectorAll("[data-library-chec
 function resolveRuleRoll(c,kind){
  const s=stat(c,"agility");
  const agilityValue=Math.max(0,Number(c.values?.[s?.id])||0);
- let threshold=kind==="evasion"?agilityValue:kind==="counter"?agilityValue-10:agilityValue-(agilityValue/2);
+ let threshold=kind==="evasion"?agilityValue:kind==="counter"?agilityValue-(agilityValue/2):agilityValue-10;
  threshold=Math.max(0,Math.min(100,Number(threshold)||0));
  const rollValue=1+Math.floor(Math.random()*100);
  const success=kind==="evasion"?rollValue<threshold:rollValue<=threshold;
@@ -300,7 +300,7 @@ function react(defenderId,reaction){
   applyDamage(d,attack-info.block,"방어 후");
  }else if(reaction==="counter"){
   const chance=resolveRuleRoll(d,"counter");
-  log(`반격 판정: 1d100=${chance.roll} ≤ AGI-10 (${chance.threshold}) → ${chance.success?"성공":"실패"}`,chance.success?"success":"failure",d.name);
+  log(`반격 판정: 1d100=${chance.roll} ≤ AGI-AGI/2 (${chance.threshold}) → ${chance.success?"성공":"실패"}`,chance.success?"success":"failure",d.name);
   if(chance.success){
    const attackStat=stat(d,"attack");
    const attackLevel=getCharacterStat(d,attackStat);
@@ -332,7 +332,7 @@ function advanceTurn(from){const active=roster.filter(alive);if(!active.length){
 function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(roster.length>1&&active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");return w;}return null;}
 function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,factionNames,factionColors,round,roundOrder}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
 function exportSave(){const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="battle-desk-backup.json";a.click();URL.revokeObjectURL(a.href);}
-function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"};theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#2878e5",background:validHex(d.theme?.background)?d.theme.background:"#11131a"};round=Number(d.round)||0;roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[];migrateCharacters();renderStats();renderThemeControls();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
+function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"};theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#8fd3ff",background:validHex(d.theme?.background)?d.theme.background:"#11131a"};round=Number(d.round)||0;roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[];migrateCharacters();renderStats();renderThemeControls();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}
 function addStatRow(){snap();stats.forEach(s=>{s.defaults.push(s.defaults[s.defaults.length-1]??"");s.evasion=s.evasion||[];s.escape=s.escape||[];s.evasion.push(s.evasion[s.evasion.length-1]??0);s.escape.push(s.escape[s.escape.length-1]??0);});renderStats();render();toast(`${rowCount()}번째 스탯 단계를 추가했습니다.`);}
 function removeStatRow(){const n=rowCount();if(n<=1){toast("최소 1줄은 유지해야 합니다.");return;}snap();stats.forEach(s=>{s.defaults.pop();if(s.evasion?.length)s.evasion.pop();if(s.escape?.length)s.escape.pop();});library.forEach(c=>syncCharacter(c,true));roster.forEach(c=>syncCharacter(c,true));renderStats();render();toast("마지막 스탯 단계를 삭제했습니다.");}
 function addStatColumn(){toast("능력치 열 추가는 현재 기본 전투 능력치 5종을 기준으로 합니다.");}
@@ -382,14 +382,14 @@ on("clear-log","click",()=>{if(confirm("로그를 비울까요?")){logs=[];rende
 on("close-modal","click",()=>{$("modal-backdrop").hidden=true;});
 
 on("help-button","click",()=>{$("help-backdrop").hidden=false;});
-on("character-search","input",()=>render());
+on("character-search","input",()=>renderLibrary());
 on("close-help","click",()=>{$("help-backdrop").hidden=true;});
 on("help-backdrop","click",e=>{if(e.target===$("help-backdrop"))$("help-backdrop").hidden=true;});
 
 on("theme-settings","click",()=>{$("theme-backdrop").hidden=false;renderThemeControls();});
 on("close-theme","click",()=>{$("theme-backdrop").hidden=true;});
 on("theme-backdrop","click",e=>{if(e.target===$("theme-backdrop"))$("theme-backdrop").hidden=true;});
-document.querySelectorAll("[data-theme-accent]").forEach(b=>b.addEventListener("click",()=>{theme.accent=b.dataset.themeAccent;renderThemeControls();save();}));
+document.querySelectorAll("[data-theme-accent]").forEach(b=>{b.style.setProperty("--swatch",b.dataset.themeAccent);b.addEventListener("click",()=>{theme.accent=b.dataset.themeAccent;renderThemeControls();save();});});
 
 on("theme-accent-color","input",e=>{theme.accent=e.target.value;renderThemeControls();save();});
 on("theme-background-color","input",e=>{theme.background=e.target.value;renderThemeControls();save();});

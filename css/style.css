@@ -139,3 +139,16 @@
 .library-card-actions{grid-column:2}
 @media(max-width:760px){.library-list{grid-template-columns:1fr}}
 @media(max-width:520px){.library-card{grid-template-columns:auto minmax(0,1fr)}}
+
+/* v30: faction colors, heal limits, log round filters, wider roster cards */
+#library-list .library-card{border-color:color-mix(in srgb,var(--faction-color,#667085) 42%,var(--line))!important}
+#character-list .character-card{border-color:color-mix(in srgb,var(--faction-color,#667085) 48%,var(--line))!important;border-top:2px solid color-mix(in srgb,var(--faction-color,#667085) 58%,var(--line))!important}
+#character-list .avatar:not(:has(img)),#library-list .avatar:not(:has(img)){background:color-mix(in srgb,var(--faction-color,#667085) 34%,var(--panel))!important;color:color-mix(in srgb,var(--faction-color,#667085) 78%,white)!important}
+#character-list .character-card.current-turn{border-color:var(--accent)!important}
+#character-list .character-card.targeting{border-color:var(--gold)!important}
+#character-list .character-card .team-tag{background:color-mix(in srgb,var(--faction-color,#667085) 24%,var(--panel))!important;color:color-mix(in srgb,var(--faction-color,#667085) 82%,white)!important}
+#character-list.character-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.log-filter{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 10px}
+.log-filter .filter-button{border-color:var(--line);white-space:nowrap}
+.heal-remaining{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
+@media(max-width:760px){#character-list.character-grid{grid-template-columns:1fr}}

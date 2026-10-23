@@ -127,3 +127,7 @@
 .library-filter-top .filter-label{order:1}
 .library-filter-top .filter-group{order:2;flex:0 0 auto}
 @media(max-width:520px){.library-filter-top .character-search{order:0;width:100%;min-width:0;margin:0 0 8px}.library-filter-top .filter-label{order:1}.library-filter-top .filter-group{order:2;flex:1}}
+
+/* v27: restore combat roster card width; compact sizing applies only to the character library */
+.character-grid{grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:12px}
+@media(max-width:760px){.character-grid{grid-template-columns:1fr}}

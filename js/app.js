@@ -156,7 +156,7 @@ function render(){
   else if(protector&&alive(c)){reactions=`<div class="reaction-box ally-reaction"><strong>🛡 대신 방어</strong><p>${esc(get(roster,pending.targetId)?.name||"아군")}을 대신해 공격을 받을 수 있습니다.</p><div class="reaction-actions"><button class="button button-secondary" data-act="react" data-reaction="guard" data-id="${c.id}">대신 방어</button></div></div>`;}
   return `<article style="--faction-color:${esc(factionColors[c.team]||"#667085")}" class="character-card team-${c.team} ${current?"current-turn":""} ${target?"targeting":""} ${protector?"guarding":""} ${inactive?"inactive":""} ${c.dead?"dead":""}"><button class="card-delete" title="전투 인원에서 제외" data-act="remove-roster" data-id="${c.id}">×</button><button class="card-edit" title="캐릭터 스탯 수정" data-act="edit-roster" data-id="${c.id}">✎</button><div class="card-top"><div class="avatar">${c.image?`<img src="${c.image}" alt="${esc(c.name)} 프로필">`:esc(c.name.slice(0,2))}</div><div class="card-title"><h4>${esc(c.name)}${c.dead?'<span class="card-status">사망</span>':c.escaped?'<span class="card-status">도주</span>':""}</h4><p>${current?`제 ${round} 라운드 · 현재 차례`:inactive?"행동 불가":""}</p><span class="team-tag">${teamLabel(c.team)}</span></div></div><div class="hp-meta"><span>체력</span><strong>${c.curHp} / ${c.maxHp}</strong></div><div class="hp-track"><div class="hp-fill ${pct<25?"low":""}" style="width:${pct}%"></div></div><div class="stat-chips">${stats.filter(s=>s.role!=="hp"&&s.role!=="counter").map(s=>`<span class="stat-chip">${esc(s.name)} <b>${getCharacterStat(c,s)}</b></span>`).join("")}</div>${actions?`<div class="card-actions">${actions}</div>`:""}<div class="gm-actions"><button class="button button-gm" data-act="gm-heal" data-id="${c.id}">GM 회복</button><button class="button button-gm" data-act="gm-damage" data-id="${c.id}">GM HP 차감</button></div>${reactions}</article>`;
  };
- const groups=["A","B"].map(team=>{const list=roster.filter(c=>c.team===team);return `<section class="roster-faction team-${team}"><div class="roster-faction-header"><h3>${teamLabel(team)}</h3><span>${list.length}명</span></div><div class="character-grid">${list.length?list.map(renderCard).join(""):`<div class="empty-state compact-empty">この 진영의 전투 인원이 없습니다.</div>`}</div></section>`;}).join("");
+ const groups=["A","B"].map(team=>{const list=roster.filter(c=>c.team===team);return `<section class="roster-faction team-${team}"><div class="roster-faction-header"><h3>${teamLabel(team)}</h3><span>${list.length}명</span></div><div class="character-grid">${list.length?list.map(renderCard).join(""):`<div class="empty-state compact-empty">이 진영에 등록된 전투 인원이 없습니다.</div>`}</div></section>`;}).join("");
  $("character-list").innerHTML=groups;
  renderLogs();save();
 }
@@ -165,9 +165,11 @@ function canHealTarget(a,b){return alive(a)&&alive(b)&&a.team===b.team;}
 function createCharacter(e){
  e.preventDefault();
  const name=$("char-name").value.trim();if(!name){toast("이름을 입력하세요.");return;}
+ const editId=$("character-form").dataset.edit;
+ const duplicate=library.some(c=>c.id!==editId&&String(c.name||"").trim().toLocaleLowerCase()===name.toLocaleLowerCase());
+ if(duplicate){toast("이미 등록된 이름입니다. 다른 이름을 입력하세요.");return;}
  const levels={},values={};const n=rowCount();
  for(const s of stats){const el=document.querySelector(`[data-character-stat="${s.id}"]`);const raw=el?.value?.trim();const parsed=Number.parseInt(raw,10);const lv=clamp(Number.isFinite(parsed)?parsed:1,1,n);levels[s.id]=lv;values[s.id]=getStatValue(s,lv);}
- const editId=$("character-form").dataset.edit;
  snap();
  if(editId){
   const c=get(library,editId);if(!c){history.pop();toast("수정할 캐릭터를 찾지 못했습니다.");return;}

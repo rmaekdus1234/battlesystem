@@ -121,3 +121,9 @@
 .small-note{margin-top:8px}
 @media(max-width:760px){.character-grid{grid-template-columns:repeat(auto-fill,minmax(175px,1fr))}}
 @media(max-width:520px){.library-filter-top{flex-wrap:wrap}.library-filter-top .filter-group{flex:1}.library-filter-top .character-search{width:100%;min-width:0;order:3}.character-grid{grid-template-columns:1fr}}
+/* v26: search first, faction filters second */
+.library-filter-top{justify-content:flex-start}
+.library-filter-top .character-search{order:0;margin-left:0;margin-right:auto;width:min(260px,40%)}
+.library-filter-top .filter-label{order:1}
+.library-filter-top .filter-group{order:2;flex:0 0 auto}
+@media(max-width:520px){.library-filter-top .character-search{order:0;width:100%;min-width:0;margin:0 0 8px}.library-filter-top .filter-label{order:1}.library-filter-top .filter-group{order:2;flex:1}}

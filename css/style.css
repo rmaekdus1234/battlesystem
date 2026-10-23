@@ -132,9 +132,10 @@
 .character-grid{grid-template-columns:repeat(auto-fill,minmax(235px,1fr));gap:12px}
 @media(max-width:760px){.character-grid{grid-template-columns:1fr}}
 
-/* v28: narrow only the cards in the full character library, not combat roster cards */
-.library-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;align-items:start}
+/* v29: two wider columns for the full character library on desktop; combat roster is unchanged */
+.library-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
 .library-card{min-width:0;margin-bottom:0;grid-template-columns:auto minmax(0,1fr);align-items:start}
 .library-card-main{min-width:0}
 .library-card-actions{grid-column:2}
-@media(max-width:520px){.library-list{grid-template-columns:1fr}.library-card{grid-template-columns:auto minmax(0,1fr)}}
+@media(max-width:760px){.library-list{grid-template-columns:1fr}}
+@media(max-width:520px){.library-card{grid-template-columns:auto minmax(0,1fr)}}

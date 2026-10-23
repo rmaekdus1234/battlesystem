@@ -106,3 +106,18 @@
 .theme-swatch{box-shadow:none;background:var(--swatch)!important;border-color:var(--line)}
 .theme-swatch[data-theme-accent="#b9f36a"]{--swatch:#b9f36a}
 @media(max-width:520px){.library-filter-toolbar{align-items:flex-end}.library-filter-controls{align-items:stretch}.library-filter-controls .character-search{width:100%;min-width:0}.library-filter-controls .filter-label{align-self:flex-start}.library-filter-controls .filter-group{width:100%;justify-content:flex-end}}
+
+/* v25: compact cards, library toolbar and uploaded avatars */
+.character-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px}
+.character-card{padding:11px}
+.card-top{gap:8px;padding-right:46px}
+.avatar{overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.library-filter-controls{align-items:stretch}
+.library-filter-top{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
+.library-filter-top .filter-label{white-space:nowrap;align-self:center}
+.library-filter-top .filter-group{justify-content:flex-start;flex:1}
+.library-filter-top .character-search{width:min(260px,40%);min-width:150px;margin-left:auto}
+.small-note{margin-top:8px}
+@media(max-width:760px){.character-grid{grid-template-columns:repeat(auto-fill,minmax(175px,1fr))}}
+@media(max-width:520px){.library-filter-top{flex-wrap:wrap}.library-filter-top .filter-group{flex:1}.library-filter-top .character-search{width:100%;min-width:0;order:3}.character-grid{grid-template-columns:1fr}}

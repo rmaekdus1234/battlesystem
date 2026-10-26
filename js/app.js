@@ -18,7 +18,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const makeId=prefix=>prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 const get=(arr,x)=>arr.find(c=>c.id===x);
-const alive=c=>!!c&&!c.dead&&!c.escaped;
+const alive=c=>!!c&&!c.dead&&!c.escaped&&Number(c.curHp)>0;
 const stat=(c,role)=>stats.find(s=>s.role===role);
 const rowCount=()=>Math.max(1,...stats.map(s=>s.defaults.length));
 
@@ -87,10 +87,6 @@ function resolveStat(c,role,{percentBase=0,allowDice=true}={}){
  const expr=getVal(c,role),p=parseExpression(expr);
  if(p.kind==="dice"&&allowDice){const r=roll(p.raw);return {value:r.value,desc:r.desc,kind:p.kind};}
  if(p.kind==="percent")return {value:percentBase*p.value/100,percent:p.value,desc:`${p.raw} → ${percentBase*p.value/100}`,kind:p.kind};
- if(p.kind==="number"&&allowDice&&(role==="attack"||role==="defense"||role==="heal")){
-  const dice=role==="attack"?"2d10":role==="defense"?"2d6":"2d10";const r=roll(dice);const value=r.value+p.value;
-  return {value,desc:`${dice}+${p.value} → ${value}`,kind:"dice"};
- }
  return {value:p.value,desc:`${p.raw} → ${p.value}`,kind:p.kind};
 }
 function syncHp(c,preserve=true){const s=stat(c,"hp");c.maxHp=Math.max(1,Number(c.values?.[s?.id])||100);if(!preserve||c.curHp===undefined)c.curHp=c.maxHp;c.curHp=clamp(Number(c.curHp)||0,0,c.maxHp);}
@@ -251,7 +247,7 @@ function rollRoundOrder(){
   const groups=[];
   const sorted=active.slice().sort((a,b)=>agility(b)-agility(a));
   for(const c of sorted){const last=groups[groups.length-1];if(last&&agility(last[0])===agility(c))last.push(c);else groups.push([c]);}
-  groups.forEach(g=>{if(g.length>1){shuffle(g);log(`민첩 동률(${agility(g[0])}) → 무작위 순서 적용`,'system');}});
+  groups.forEach(g=>{if(g.length>1){shuffle(g);log(`민첩 동률(${agility(g[0])}) → 무작위 순서 추첨: ${g.map(c=>c.name).join(" > ")}`,'system');}});
   roundOrder=groups.flat().map(c=>c.id);
   log(`◆ ${round}라운드 민첩순 정렬`,'system');
   log(`▶ 턴 순서: ${roundOrder.map(x=>get(roster,x)?.name).join(" > ")}`,"turn-order");
@@ -361,7 +357,7 @@ function gmHpAdjust(cid){const c=get(roster,cid);if(!c)return;const raw=prompt(`
 스킬 등 프로그램 밖에서 처리한 효과를 적용할 때 사용합니다.`,`10`);if(raw===null)return;const input=raw.trim();if(!/^[+-]?\d+(?:\.\d+)?$/.test(input)){toast("숫자를 입력하세요. 예: 10, +10, -10");return;}const amount=Number(input);if(amount===0){toast("0이 아닌 값을 입력하세요.");return;}snap();const before=c.curHp;c.curHp=clamp(c.curHp+amount,0,c.maxHp);c.dead=c.curHp<=0;log(`GM HP 조정: ${before} → ${c.curHp} (${amount>0?"회복":"차감"} ${Math.abs(amount)})`,"normal",c.name);render();}
 function escape(cid){const c=get(roster,cid);if(!c)return;snap();const r=escapeCheck(c);log(`도주 판정: 1d100=${r.roll} ≤ ${r.threshold} → ${r.success?"성공":"실패"}`,"normal",c.name);if(r.success){c.escaped=true;log(`도주 성공`,"important",c.name);}else log(`도주 실패`,"normal",c.name);const w=checkVictory();if(w){started=false;currentId=null;render();}else advanceTurn(cid);}
 function advanceTurn(from){const active=roster.filter(alive);if(!active.length){started=false;currentId=null;render();return;}let idx=roundOrder.indexOf(from);if(idx<0)idx=roundOrder.indexOf(currentId);let next=null;for(let i=idx+1;i<roundOrder.length;i++){const c=get(roster,roundOrder[i]);if(alive(c)){next=c;break;}}if(next){currentId=next.id;}else{beginRound();}log(`▶ 다음 차례`,"normal",get(roster,currentId)?.name||"");render();}
-function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(roster.length>1&&active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}return null;}
+function checkVictory(){const active=roster.filter(alive),A=roster.some(c=>c.team==="A"),B=roster.some(c=>c.team==="B");if(A&&B){const aa=active.some(c=>c.team==="A"),bb=active.some(c=>c.team==="B");if(!aa||!bb){const w=aa?"A 진영":bb?"B 진영":"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}}else if(active.length<=1){const w=active[0]?.name||"무승부";log(`전투 종료: ${w}`,"system");toast(`전투 종료: ${w}`);return w;}return null;}
 function undo(){if(!history.length)return;const s=history.pop();({stats,library,roster,logs,currentId,pending,started,mode,healLimit,factionNames,factionColors,round,roundOrder}=s);renderStats();render();toast("이전 상태로 되돌렸습니다.");}
 function exportSave(){const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="battle-desk-backup.json";a.click();URL.revokeObjectURL(a.href);}
 function importSave(file){const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);stats=normalizeStats(d.stats||clone(DEFAULT_STATS));library=d.library||[];roster=d.roster||[];logs=d.logs||[];currentId=d.currentId||null;pending=d.pending||null;started=!!d.started;mode=d.mode||"speed";healLimit=Math.max(0,Math.floor(Number(d.healLimit)||0));factionNames={A:d.factionNames?.A||"A 진영",B:d.factionNames?.B||"B 진영"};factionColors={A:validHex(d.factionColors?.A)?d.factionColors.A:"#4c8dff",B:validHex(d.factionColors?.B)?d.factionColors.B:"#e85d75"};theme={accent:validHex(d.theme?.accent)?d.theme.accent:"#8fd3ff",background:validHex(d.theme?.background)?d.theme.background:"#11131a"};round=Number(d.round)||0;roundOrder=Array.isArray(d.roundOrder)?d.roundOrder:[];migrateCharacters();renderStats();renderThemeControls();render();toast("백업을 불러왔습니다.");}catch(e){alert("백업 파일을 읽지 못했습니다.");}};r.readAsText(file);}

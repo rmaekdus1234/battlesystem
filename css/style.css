@@ -153,3 +153,4 @@
 .heal-remaining{border-color:color-mix(in srgb,var(--accent) 50%,var(--line))}
 @media(max-width:760px){#character-list.character-grid{grid-template-columns:1fr}}
 .card-tags{display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:4px}.card-tags .team-tag{margin-top:0}.card-tags .heal-remaining{margin:0}
+[hidden]{display:none!important}
